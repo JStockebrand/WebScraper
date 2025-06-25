@@ -89,8 +89,12 @@ This is a full-stack web application that allows users to search the web, scrape
 - **Deployment**: Autoscale with health checks on port 5000
 - **Workflows**: Automated startup with port waiting
 
-## Changelog
-- June 25, 2025. Initial setup
+## Recent Changes
+- June 25, 2025: Fixed 3 breaking changes for production deployment:
+  - Updated fetch API to use AbortController instead of deprecated timeout option
+  - Resolved TypeScript storage interface type mismatches with proper null handling
+  - Added intelligent fallback summary system for OpenAI quota limitations
+- June 25, 2025: Initial setup
 
 ## User Preferences
 
