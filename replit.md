@@ -90,6 +90,10 @@ This is a full-stack web application that allows users to search the web, scrape
 - **Workflows**: Automated startup with port waiting
 
 ## Recent Changes
+- June 25, 2025: Optimized OpenAI API usage to minimize quota impact:
+  - Search engine now finds and validates top 5 links first
+  - OpenAI API only processes successfully scraped content (saving failed scrapes from using quota)
+  - Added logging to show API call savings in real-time
 - June 25, 2025: Fixed 3 breaking changes for production deployment:
   - Updated fetch API to use AbortController instead of deprecated timeout option
   - Resolved TypeScript storage interface type mismatches with proper null handling

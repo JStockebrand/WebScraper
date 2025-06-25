@@ -71,74 +71,100 @@ async function processSearchAsync(searchId: number, query: string, startTime: nu
       return;
     }
 
-    // Step 2: Process each result
+    // Step 2: First scrape all content without AI processing
+    const scrapedResults = [];
     for (const result of searchResults) {
+      let scrapingStatus = 'failed';
+      let errorMessage: string | undefined;
+      let readingTime = '';
+      let publishedDate: string | undefined;
+      let scrapedContent: string | null = null;
+
       try {
-        let scrapingStatus = 'success';
-        let summary = '';
-        let confidence = 0;
-        let sourcesCount = 0;
-        let errorMessage: string | undefined;
-        let readingTime = '';
-        let publishedDate: string | undefined;
+        const content = await scraperService.scrapeUrl(result.url);
+        scrapedContent = content.content;
+        readingTime = content.readingTime;
+        publishedDate = content.publishedDate;
+        scrapingStatus = 'success';
+      } catch (scrapingError) {
+        console.error(`Failed to scrape ${result.url}:`, scrapingError);
+        errorMessage = scrapingError instanceof Error ? scrapingError.message : 'Unknown error';
+        
+        // Check if we can use snippet as fallback
+        if (result.snippet && result.snippet.length > 50) {
+          scrapedContent = result.snippet;
+          scrapingStatus = 'partial';
+        }
+      }
 
+      scrapedResults.push({
+        searchResult: result,
+        scrapedContent,
+        scrapingStatus,
+        errorMessage,
+        readingTime,
+        publishedDate,
+      });
+    }
+
+    // Step 3: Only use OpenAI for successfully scraped content
+    const successfulScrapes = scrapedResults.filter(r => r.scrapedContent && r.scrapedContent.length > 50);
+    console.log(`OpenAI optimization: Processing ${successfulScrapes.length}/${scrapedResults.length} results with AI (saving ${scrapedResults.length - successfulScrapes.length} API calls)`);
+    
+    // Process AI summaries efficiently
+    for (const scraped of scrapedResults) {
+      let summary = '';
+      let confidence = 0;
+      let sourcesCount = 0;
+
+      // Only call OpenAI if we have meaningful content
+      if (scraped.scrapedContent && scraped.scrapedContent.length > 50) {
         try {
-          // Scrape content
-          const scrapedContent = await scraperService.scrapeUrl(result.url);
-          readingTime = scrapedContent.readingTime;
-          publishedDate = scrapedContent.publishedDate;
-
-          // Generate AI summary
           const summaryResult = await openaiService.summarizeContent(
-            scrapedContent.content,
-            result.title,
-            result.url
+            scraped.scrapedContent,
+            scraped.searchResult.title,
+            scraped.searchResult.url
           );
           
           summary = summaryResult.summary;
           confidence = summaryResult.confidence;
           sourcesCount = summaryResult.sourcesCount;
-        } catch (scrapingError) {
-          console.error(`Failed to process ${result.url}:`, scrapingError);
-          scrapingStatus = 'failed';
-          errorMessage = scrapingError instanceof Error ? scrapingError.message : 'Unknown error';
           
-          // Try to generate summary from snippet if available
-          if (result.snippet && result.snippet.length > 50) {
-            try {
-              const summaryResult = await openaiService.summarizeContent(
-                result.snippet,
-                result.title,
-                result.url
-              );
-              summary = summaryResult.summary;
-              confidence = Math.max(0, summaryResult.confidence - 30); // Reduce confidence for snippet-based summary
-              sourcesCount = summaryResult.sourcesCount;
-              scrapingStatus = 'partial';
-            } catch {
-              // If even snippet summarization fails, leave empty
-            }
+          // Reduce confidence for partial scrapes
+          if (scraped.scrapingStatus === 'partial') {
+            confidence = Math.max(0, confidence - 30);
           }
+        } catch (aiError) {
+          console.error(`AI summarization failed for ${scraped.searchResult.url}:`, aiError);
+          // Fallback to basic summary without using OpenAI quota
+          summary = scraped.scrapedContent.split(/[.!?]+/)
+            .filter(s => s.trim().length > 20)
+            .slice(0, 2)
+            .join('. ').trim() + '.';
+          confidence = scraped.scrapingStatus === 'success' ? 50 : 30;
+          sourcesCount = 0;
         }
-
-        // Store result
-        await storage.createSearchResult({
-          searchId,
-          title: result.title,
-          url: result.url,
-          domain: result.domain,
-          publishedDate,
-          readingTime,
-          scrapingStatus,
-          summary,
-          confidence,
-          sourcesCount,
-          errorMessage,
-        });
-      } catch (error) {
-        console.error(`Error processing result ${result.url}:`, error);
-        // Continue with other results even if one fails
+      } else if (scraped.scrapingStatus === 'failed' && scraped.searchResult.snippet) {
+        // Use snippet as basic summary for failed scrapes
+        summary = scraped.searchResult.snippet;
+        confidence = 20;
+        sourcesCount = 0;
       }
+
+      // Store result
+      await storage.createSearchResult({
+        searchId,
+        title: scraped.searchResult.title,
+        url: scraped.searchResult.url,
+        domain: scraped.searchResult.domain,
+        publishedDate: scraped.publishedDate,
+        readingTime: scraped.readingTime,
+        scrapingStatus: scraped.scrapingStatus,
+        summary,
+        confidence,
+        sourcesCount,
+        errorMessage: scraped.errorMessage,
+      });
     }
 
     // Update search status
