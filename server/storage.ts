@@ -57,6 +57,12 @@ export class MemStorage implements IStorage {
     const result: SearchResult = {
       ...insertResult,
       id,
+      summary: insertResult.summary ?? null,
+      publishedDate: insertResult.publishedDate ?? null,
+      readingTime: insertResult.readingTime ?? null,
+      confidence: insertResult.confidence ?? null,
+      sourcesCount: insertResult.sourcesCount ?? null,
+      errorMessage: insertResult.errorMessage ?? null,
     };
     this.searchResults.set(id, result);
     return result;
