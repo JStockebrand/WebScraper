@@ -14,7 +14,7 @@ export interface SummaryResult {
 export class OpenAIService {
   async summarizeContent(content: string, title: string, url: string): Promise<SummaryResult> {
     if (!openai.apiKey) {
-      throw new Error("OpenAI API key not configured");
+      return this.generateFallbackSummary(content, title);
     }
 
     try {
@@ -58,8 +58,32 @@ Respond with JSON in this format: { "summary": "string", "confidence": number, "
       };
     } catch (error) {
       console.error("OpenAI API error:", error);
+      // Fallback to basic summary if API fails
+      if (error instanceof Error && (error.message.includes('quota') || error.message.includes('429'))) {
+        console.warn("OpenAI quota exceeded, using fallback summary");
+        return this.generateFallbackSummary(content, title);
+      }
       throw new Error("Failed to generate summary using AI");
     }
+  }
+
+  private generateFallbackSummary(content: string, title: string): SummaryResult {
+    // Extract first few sentences as summary
+    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 20);
+    const summary = sentences.slice(0, 2).join('. ').trim() + '.';
+    
+    // Basic confidence based on content length and structure
+    const wordCount = content.split(/\s+/).length;
+    const confidence = Math.min(85, Math.max(40, Math.floor(wordCount / 10)));
+    
+    // Count potential sources (URLs, citations, references)
+    const sourcesCount = (content.match(/https?:\/\/|www\.|@\w+|[\[\(]\d+[\]\)]|\b(source|reference|citation)\b/gi) || []).length;
+    
+    return {
+      summary: summary.length > 10 ? summary : `Summary of ${title}: ${content.substring(0, 200)}...`,
+      confidence,
+      sourcesCount: Math.min(sourcesCount, 10)
+    };
   }
 }
 

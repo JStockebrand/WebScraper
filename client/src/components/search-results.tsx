@@ -166,7 +166,7 @@ export default function SearchResults({ searchId, searchQuery }: SearchResultsPr
 
             <div className="flex justify-between items-center pt-4 border-t border-border">
               <div className="flex items-center space-x-4">
-                {result.confidence !== null && (
+                {result.confidence !== null && result.confidence !== undefined && (
                   <span className="text-xs text-muted-foreground">
                     Confidence: <span className={`font-medium ${getConfidenceColor(result.confidence)}`}>{result.confidence}%</span>
                   </span>
