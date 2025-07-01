@@ -138,6 +138,8 @@ async function processSearchAsync(searchId: number, query: string, startTime: nu
       let summary = '';
       let confidence = 0;
       let sourcesCount = 0;
+      let keywords: string[] = [];
+      let metadata = { topic: 'Unknown', category: 'General', entities: [] };
 
       // Only call OpenAI if we have meaningful content
       if (scraped.scrapedContent && scraped.scrapedContent.length > 50) {
@@ -151,6 +153,8 @@ async function processSearchAsync(searchId: number, query: string, startTime: nu
           summary = summaryResult.summary;
           confidence = summaryResult.confidence;
           sourcesCount = summaryResult.sourcesCount;
+          keywords = summaryResult.keywords || [];
+          metadata = summaryResult.metadata || { topic: 'Unknown', category: 'General', entities: [] };
           
           // Reduce confidence for partial scrapes
           if (scraped.scrapingStatus === 'partial') {
@@ -165,12 +169,16 @@ async function processSearchAsync(searchId: number, query: string, startTime: nu
             .join('. ').trim() + '.';
           confidence = scraped.scrapingStatus === 'success' ? 50 : 30;
           sourcesCount = 0;
+          keywords = [];
+          metadata = { topic: 'Unknown', category: 'General', entities: [] };
         }
       } else if (scraped.scrapingStatus === 'failed' && scraped.searchResult.snippet) {
         // Use snippet as basic summary for failed scrapes
         summary = scraped.searchResult.snippet;
         confidence = 20;
         sourcesCount = 0;
+        keywords = [];
+        metadata = { topic: 'Unknown', category: 'General', entities: [] };
       }
 
       // Store result
@@ -185,6 +193,8 @@ async function processSearchAsync(searchId: number, query: string, startTime: nu
         summary,
         confidence,
         sourcesCount,
+        keywords: JSON.stringify(keywords),
+        metadata: JSON.stringify(metadata),
         errorMessage: scraped.errorMessage,
       });
     }

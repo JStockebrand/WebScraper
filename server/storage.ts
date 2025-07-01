@@ -62,6 +62,8 @@ export class MemStorage implements IStorage {
       readingTime: insertResult.readingTime ?? null,
       confidence: insertResult.confidence ?? null,
       sourcesCount: insertResult.sourcesCount ?? null,
+      keywords: insertResult.keywords ?? null,
+      metadata: insertResult.metadata ?? null,
       errorMessage: insertResult.errorMessage ?? null,
     };
     this.searchResults.set(id, result);

@@ -96,7 +96,10 @@ This is a full-stack web application that allows users to search the web, scrape
   - Added comprehensive logging for 429 errors and usage tracking
   - Implemented 5-minute cooldown after quota exhaustion
   - Added API endpoints for usage statistics (/api/openai/stats)
-  - Enhanced fallback summary generation with improved confidence scoring
+  - Enhanced fallback summary generation with SEO keyword extraction
+  - Added metadata extraction (topic categorization, entity recognition)
+  - Implemented advanced keyword extraction with stop-word filtering
+  - Updated database schema to store keywords and metadata fields
 - July 1, 2025: Integrated SerpAPI Google Search for real search results:
   - Replaced mock search data with actual Google search API
   - Added SERP_API_KEY secret configuration

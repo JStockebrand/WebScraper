@@ -350,7 +350,7 @@ Respond with JSON in this format: {
     entities.push(...filteredEntities);
     
     // Remove duplicates and limit
-    const uniqueEntities = [...new Set(entities)].slice(0, 5);
+    const uniqueEntities = Array.from(new Set(entities)).slice(0, 5);
     
     return {
       topic: topic.charAt(0).toUpperCase() + topic.slice(1),
