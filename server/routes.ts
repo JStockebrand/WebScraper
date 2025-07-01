@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { searchService } from "./services/search";
 import { scraperService } from "./services/scraper";
-import { openaiService } from "./services/openai";
+import { summarizeService } from "./services/summarize";
 import { insertSearchSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -54,6 +54,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get search error:", error);
       res.status(500).json({ error: "Failed to get search results" });
+    }
+  });
+
+  // Get OpenAI usage statistics
+  app.get("/api/openai/stats", (req, res) => {
+    try {
+      const stats = summarizeService.getUsageStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Get OpenAI stats error:", error);
+      res.status(500).json({ error: "Failed to get OpenAI usage statistics" });
+    }
+  });
+
+  // Reset OpenAI usage statistics (for development/testing)
+  app.post("/api/openai/reset-stats", (req, res) => {
+    try {
+      summarizeService.resetUsageStats();
+      res.json({ message: "OpenAI usage statistics reset successfully" });
+    } catch (error) {
+      console.error("Reset OpenAI stats error:", error);
+      res.status(500).json({ error: "Failed to reset OpenAI usage statistics" });
     }
   });
 
@@ -120,7 +142,7 @@ async function processSearchAsync(searchId: number, query: string, startTime: nu
       // Only call OpenAI if we have meaningful content
       if (scraped.scrapedContent && scraped.scrapedContent.length > 50) {
         try {
-          const summaryResult = await openaiService.summarizeContent(
+          const summaryResult = await summarizeService.summarizeContent(
             scraped.scrapedContent,
             scraped.searchResult.title,
             scraped.searchResult.url
