@@ -90,6 +90,17 @@ This is a full-stack web application that allows users to search the web, scrape
 - **Workflows**: Automated startup with port waiting
 
 ## Recent Changes
+- July 1, 2025: Enhanced OpenAI integration with comprehensive quota management:
+  - Created new summarize.ts service with intelligent quota handling
+  - Switched to gpt-3.5-turbo for cost optimization (from gpt-4o)
+  - Added comprehensive logging for 429 errors and usage tracking
+  - Implemented 5-minute cooldown after quota exhaustion
+  - Added API endpoints for usage statistics (/api/openai/stats)
+  - Enhanced fallback summary generation with improved confidence scoring
+- July 1, 2025: Integrated SerpAPI Google Search for real search results:
+  - Replaced mock search data with actual Google search API
+  - Added SERP_API_KEY secret configuration
+  - Verified complete search-to-summary pipeline functionality
 - June 25, 2025: Optimized OpenAI API usage to minimize quota impact:
   - Search engine now finds and validates top 5 links first
   - OpenAI API only processes successfully scraped content (saving failed scrapes from using quota)
