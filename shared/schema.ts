@@ -23,6 +23,8 @@ export const searchResults = pgTable("search_results", {
   summary: text("summary"),
   confidence: integer("confidence"), // 0-100
   sourcesCount: integer("sources_count").default(0),
+  keywords: text("keywords"), // JSON array of keywords
+  metadata: text("metadata"), // JSON object with topic, category, entities
   errorMessage: text("error_message"),
 });
 
@@ -41,6 +43,8 @@ export const insertSearchResultSchema = createInsertSchema(searchResults).pick({
   summary: true,
   confidence: true,
   sourcesCount: true,
+  keywords: true,
+  metadata: true,
   errorMessage: true,
 });
 

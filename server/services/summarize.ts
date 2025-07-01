@@ -9,6 +9,12 @@ export interface SummaryResult {
   summary: string;
   confidence: number;
   sourcesCount: number;
+  keywords?: string[];
+  metadata?: {
+    topic: string;
+    category: string;
+    entities: string[];
+  };
 }
 
 export interface ApiUsageStats {
@@ -60,11 +66,23 @@ Content: ${content.substring(0, 4000)} ${content.length > 4000 ? '...' : ''}
 
 Please provide a concise summary that captures the essence of the article while being informative and objective. The summary should be 2-3 sentences long and highlight the most important information.
 
-Additionally, assess:
+Additionally, extract:
 1. Your confidence in the summary quality (0-100)
 2. Number of distinct sources or references mentioned in the content
+3. 5-8 relevant keywords for SEO/metadata (important terms, topics, entities)
+4. Topic classification and main entities mentioned
 
-Respond with JSON in this format: { "summary": "string", "confidence": number, "sourcesCount": number }`;
+Respond with JSON in this format: { 
+  "summary": "string", 
+  "confidence": number, 
+  "sourcesCount": number,
+  "keywords": ["keyword1", "keyword2", ...],
+  "metadata": {
+    "topic": "main topic",
+    "category": "content category",
+    "entities": ["entity1", "entity2", ...]
+  }
+}`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo", // Using gpt-3.5-turbo as requested for cost optimization
@@ -95,6 +113,8 @@ Respond with JSON in this format: { "summary": "string", "confidence": number, "
         summary: result.summary || "Unable to generate summary",
         confidence: Math.max(0, Math.min(100, result.confidence || 0)),
         sourcesCount: Math.max(0, result.sourcesCount || 0),
+        keywords: result.keywords || [],
+        metadata: result.metadata || { topic: "Unknown", category: "General", entities: [] }
       };
     } catch (error) {
       const duration = Date.now() - requestStartTime;
@@ -218,14 +238,125 @@ Respond with JSON in this format: { "summary": "string", "confidence": number, "
     
     const sourcesCount = Math.min(urlMatches.length + citationMatches.length + Math.floor(referenceMatches.length / 3), 10);
     
+    // Keyword extraction for SEO/metadata
+    const keywords = this.extractKeywords(content, title);
+    const metadata = this.extractMetadata(content, title, keywords);
+    
     const result = {
       summary: summary.length > 10 ? summary : `Summary of ${title}: ${content.substring(0, 200)}...`,
       confidence: Math.max(40, Math.min(85, confidence)),
-      sourcesCount
+      sourcesCount,
+      keywords,
+      metadata
     };
 
-    console.log(`✅ Fallback summary generated - confidence: ${result.confidence}%, sources: ${result.sourcesCount}`);
+    console.log(`✅ Fallback summary generated - confidence: ${result.confidence}%, sources: ${result.sourcesCount}, keywords: ${keywords.length}`);
     return result;
+  }
+
+  private extractKeywords(content: string, title: string): string[] {
+    // Combine title and content for keyword extraction
+    const text = `${title} ${content}`.toLowerCase();
+    
+    // Common stop words to filter out
+    const stopWords = new Set([
+      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could', 'can', 'may', 'might', 'must', 'shall', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'her', 'its', 'our', 'their', 'mine', 'yours', 'hers', 'ours', 'theirs', 'myself', 'yourself', 'himself', 'herself', 'itself', 'ourselves', 'yourselves', 'themselves', 'what', 'which', 'who', 'whom', 'whose', 'where', 'when', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'now', 'here', 'there', 'then', 'also', 'back', 'even', 'still', 'way', 'well', 'get', 'go', 'know', 'take', 'see', 'come', 'think', 'look', 'want', 'give', 'use', 'find', 'tell', 'ask', 'work', 'seem', 'feel', 'try', 'leave', 'call'
+    ]);
+    
+    // Extract words (2+ chars, alphanumeric)
+    const words = text.match(/\b[a-z0-9]{2,}\b/g) || [];
+    
+    // Count word frequency, excluding stop words
+    const wordCount = new Map<string, number>();
+    words.forEach(word => {
+      if (!stopWords.has(word) && word.length > 2) {
+        wordCount.set(word, (wordCount.get(word) || 0) + 1);
+      }
+    });
+    
+    // Extract compound terms (2-3 words)
+    const compounds = text.match(/\b[a-z0-9]+\s+[a-z0-9]+(?:\s+[a-z0-9]+)?\b/g) || [];
+    compounds.forEach(compound => {
+      const words = compound.split(/\s+/);
+      if (words.every(w => !stopWords.has(w)) && words.length <= 3) {
+        wordCount.set(compound, (wordCount.get(compound) || 0) + 2); // Higher weight for compounds
+      }
+    });
+    
+    // Extract capitalized terms (likely proper nouns/important terms)
+    const capitalizedTerms = content.match(/\b[A-Z][a-z0-9]+(?:\s+[A-Z][a-z0-9]+)*\b/g) || [];
+    capitalizedTerms.forEach(term => {
+      const normalized = term.toLowerCase();
+      if (!stopWords.has(normalized)) {
+        wordCount.set(normalized, (wordCount.get(normalized) || 0) + 3); // Higher weight for proper nouns
+      }
+    });
+    
+    // Sort by frequency and take top keywords
+    const sortedKeywords = Array.from(wordCount.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([word]) => word);
+    
+    return sortedKeywords;
+  }
+
+  private extractMetadata(content: string, title: string, keywords: string[]): { topic: string; category: string; entities: string[] } {
+    const text = `${title} ${content}`.toLowerCase();
+    
+    // Determine category based on content patterns
+    let category = 'General';
+    const categoryPatterns = {
+      'Technology': /\b(software|programming|code|api|javascript|python|react|node|tech|computer|digital|app|web|development)\b/i,
+      'Business': /\b(business|marketing|sales|company|revenue|profit|strategy|management|enterprise|corporate)\b/i,
+      'Science': /\b(research|study|scientific|analysis|data|experiment|hypothesis|theory|methodology)\b/i,
+      'Health': /\b(health|medical|healthcare|doctor|patient|treatment|medicine|clinical|therapy)\b/i,
+      'Education': /\b(education|learning|teaching|student|course|tutorial|guide|lesson|training)\b/i,
+      'Sports': /\b(sport|game|team|player|match|score|tournament|championship|athletic)\b/i,
+      'Travel': /\b(travel|trip|vacation|destination|hotel|flight|tourism|guide|location)\b/i,
+      'Finance': /\b(finance|financial|money|investment|bank|trading|market|economy|budget)\b/i,
+      'Food': /\b(food|recipe|cooking|restaurant|cuisine|dish|ingredient|meal|dining)\b/i,
+      'Entertainment': /\b(movie|film|music|song|entertainment|celebrity|show|performance|art)\b/i,
+      'News': /\b(news|report|breaking|update|announcement|press|media|journalist)\b/i,
+      'Outdoors': /\b(fishing|hunting|hiking|camping|outdoor|nature|wildlife|creek|river|lake|mountain|trail|recreation)\b/i
+    };
+    
+    for (const [cat, pattern] of Object.entries(categoryPatterns)) {
+      if (pattern.test(text)) {
+        category = cat;
+        break;
+      }
+    }
+    
+    // Extract main topic from title and keywords
+    const topic = keywords.length > 0 ? keywords[0] : title.split(/\s+/).slice(0, 3).join(' ');
+    
+    // Extract entities (proper nouns, locations, organizations)
+    const entities: string[] = [];
+    
+    // Extract locations
+    const locationPatterns = content.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:\s+(?:County|City|State|Creek|River|Lake|Mountain|Park|Colorado|CA|NY|TX|FL))\b/g) || [];
+    entities.push(...locationPatterns.slice(0, 3));
+    
+    // Extract organizations/brands
+    const orgPatterns = content.match(/\b[A-Z][a-z]*(?:[A-Z][a-z]*)*(?:\s+(?:Inc|Corp|LLC|Company|Organization|Association|Foundation))\b/g) || [];
+    entities.push(...orgPatterns.slice(0, 2));
+    
+    // Extract other capitalized entities
+    const capitalizedEntities = content.match(/\b[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})*\b/g) || [];
+    const filteredEntities = capitalizedEntities
+      .filter(entity => !entity.match(/^(The|This|That|These|Those|When|Where|What|Why|How)$/))
+      .slice(0, 3);
+    entities.push(...filteredEntities);
+    
+    // Remove duplicates and limit
+    const uniqueEntities = [...new Set(entities)].slice(0, 5);
+    
+    return {
+      topic: topic.charAt(0).toUpperCase() + topic.slice(1),
+      category,
+      entities: uniqueEntities
+    };
   }
 
   // Public method to get usage statistics
