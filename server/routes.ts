@@ -139,7 +139,7 @@ async function processSearchAsync(searchId: number, query: string, startTime: nu
       let confidence = 0;
       let sourcesCount = 0;
       let keywords: string[] = [];
-      let metadata = { topic: 'Unknown', category: 'General', entities: [] };
+      let metadata: { topic: string; category: string; entities: string[] } = { topic: 'Unknown', category: 'General', entities: [] };
 
       // Only call OpenAI if we have meaningful content
       if (scraped.scrapedContent && scraped.scrapedContent.length > 50) {
@@ -170,7 +170,7 @@ async function processSearchAsync(searchId: number, query: string, startTime: nu
           confidence = scraped.scrapingStatus === 'success' ? 50 : 30;
           sourcesCount = 0;
           keywords = [];
-          metadata = { topic: 'Unknown', category: 'General', entities: [] };
+          metadata = { topic: 'Unknown', category: 'General', entities: [] } as { topic: string; category: string; entities: string[] };
         }
       } else if (scraped.scrapingStatus === 'failed' && scraped.searchResult.snippet) {
         // Use snippet as basic summary for failed scrapes
@@ -178,7 +178,7 @@ async function processSearchAsync(searchId: number, query: string, startTime: nu
         confidence = 20;
         sourcesCount = 0;
         keywords = [];
-        metadata = { topic: 'Unknown', category: 'General', entities: [] };
+        metadata = { topic: 'Unknown', category: 'General', entities: [] } as { topic: string; category: string; entities: string[] };
       }
 
       // Store result
