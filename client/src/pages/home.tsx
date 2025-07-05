@@ -1,190 +1,226 @@
 import { useState } from "react";
-import { Search, Globe, Brain, Worm } from "lucide-react";
-import SearchForm from "@/components/search-form";
-import LoadingState from "@/components/loading-state";
-import SearchResults from "@/components/search-results";
+import { Search, FileText, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { apiRequest } from "@/lib/queryClient";
+
+interface SearchResult {
+  title: string;
+  url: string;
+  summary: string;
+  confidence: number;
+  scrapingStatus: string;
+  readingTime: string;
+}
+
+interface SearchData {
+  search: {
+    query: string;
+    status: string;
+    totalResults: number;
+  };
+  results: SearchResult[];
+}
 
 export default function Home() {
-  const [searchStatus, setSearchStatus] = useState<'idle' | 'searching' | 'completed' | 'error'>('idle');
-  const [searchId, setSearchId] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [searchData, setSearchData] = useState<SearchData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSearchSubmit = (query: string, searchId: number) => {
-    setSearchQuery(query);
-    setSearchId(searchId);
-    setSearchStatus('searching');
+  const handleSearch = async () => {
+    if (!query.trim()) return;
+    
+    setLoading(true);
+    setError(null);
+    setSearchData(null);
+
+    try {
+      // Start search
+      const searchResponse = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: query.trim() })
+      });
+
+      const { searchId } = await searchResponse.json();
+      
+      // Poll for results
+      let attempts = 0;
+      const maxAttempts = 30; // 30 seconds max
+      
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const resultResponse = await fetch(`/api/search/${searchId}`);
+        const data = await resultResponse.json();
+        
+        if (data.search.status === 'completed') {
+          setSearchData(data);
+          break;
+        } else if (data.search.status === 'error') {
+          setError('Search failed. Please try again.');
+          break;
+        }
+        
+        attempts++;
+      }
+      
+      if (attempts >= maxAttempts) {
+        setError('Search timed out. Please try again.');
+      }
+    } catch (err) {
+      setError('An error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSearchComplete = () => {
-    setSearchStatus('completed');
-  };
-
-  const handleSearchError = () => {
-    setSearchStatus('error');
-  };
-
-  const handleRetrySearch = () => {
-    setSearchStatus('idle');
-    setSearchId(null);
-    setSearchQuery('');
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-border sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <Search className="text-primary text-2xl" />
-              <h1 className="text-xl font-semibold text-foreground">WebScrape Summarizer</h1>
-            </div>
-            <nav className="hidden md:flex items-center space-x-6">
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors">How it works</a>
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors">API Docs</a>
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors">Pricing</a>
-              <button className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors">
-                Sign Up
-              </button>
-            </nav>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8 pt-8">
+          <div className="flex items-center justify-center mb-4">
+            <Search className="h-8 w-8 text-blue-600 mr-2" />
+            <h1 className="text-3xl font-bold text-gray-900">Web Research Tool</h1>
           </div>
+          <p className="text-gray-600">Enter any topic to get summaries from 5 relevant web sources</p>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search Form */}
-        <SearchForm 
-          onSubmit={handleSearchSubmit}
-          disabled={searchStatus === 'searching'}
-        />
+        {/* Search Input */}
+        <Card className="mb-8">
+          <CardContent className="p-6">
+            <div className="flex gap-3">
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Enter your research topic (e.g., 'artificial intelligence trends', 'climate change solutions')"
+                className="flex-1 text-lg"
+                disabled={loading}
+              />
+              <Button 
+                onClick={handleSearch} 
+                disabled={loading || !query.trim()}
+                className="px-6"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Searching...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4 mr-2" />
+                    Search
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Loading State */}
-        {searchStatus === 'searching' && searchId && (
-          <LoadingState 
-            searchId={searchId}
-            onComplete={handleSearchComplete}
-            onError={handleSearchError}
-          />
-        )}
-
-        {/* Search Results */}
-        {searchStatus === 'completed' && searchId && (
-          <SearchResults 
-            searchId={searchId}
-            searchQuery={searchQuery}
-          />
+        {loading && (
+          <Card className="mb-8">
+            <CardContent className="p-6 text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+              <h3 className="text-lg font-semibold mb-2">Researching your topic...</h3>
+              <p className="text-gray-600">Finding 5 relevant sources, scraping content, and generating summaries</p>
+            </CardContent>
+          </Card>
         )}
 
         {/* Error State */}
-        {searchStatus === 'error' && (
-          <div className="text-center py-12">
-            <div className="max-w-md mx-auto bg-white rounded-xl shadow-sm border border-border p-8">
-              <div className="text-destructive text-5xl mb-4">
-                <i className="fas fa-exclamation-triangle"></i>
-              </div>
-              <h3 className="text-xl font-semibold text-foreground mb-2">Search Failed</h3>
-              <p className="text-muted-foreground mb-6">
-                We encountered an issue while searching. This might be due to API limits or network connectivity.
+        {error && (
+          <Card className="mb-8 border-red-200">
+            <CardContent className="p-6 text-center">
+              <div className="text-red-500 text-xl mb-2">⚠️</div>
+              <h3 className="text-lg font-semibold text-red-700 mb-2">Search Failed</h3>
+              <p className="text-red-600">{error}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Results */}
+        {searchData && (
+          <div className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Research Summary: "{searchData.search.query}"
+              </h2>
+              <p className="text-gray-600">
+                Found {searchData.results.length} sources with summaries
               </p>
-              <div className="space-y-3">
-                <button 
-                  onClick={handleRetrySearch}
-                  className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
-                >
-                  <i className="fas fa-refresh mr-2"></i>
-                  Try Again
-                </button>
-                <button className="w-full border border-border text-muted-foreground px-4 py-2 rounded-lg hover:bg-accent transition-colors">
-                  Contact Support
-                </button>
-              </div>
+            </div>
+
+            <div className="grid gap-6">
+              {searchData.results.map((result, index) => (
+                <Card key={index} className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg mb-2">
+                          {result.title}
+                        </CardTitle>
+                        <CardDescription className="flex items-center gap-2 mb-2">
+                          <a 
+                            href={result.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline truncate"
+                          >
+                            {result.url}
+                          </a>
+                        </CardDescription>
+                        <div className="flex gap-2">
+                          <Badge variant={result.scrapingStatus === 'success' ? 'default' : 'secondary'}>
+                            {result.scrapingStatus}
+                          </Badge>
+                          {result.readingTime && (
+                            <Badge variant="outline">
+                              {result.readingTime}
+                            </Badge>
+                          )}
+                          <Badge variant="outline">
+                            {result.confidence}% confidence
+                          </Badge>
+                        </div>
+                      </div>
+                      <FileText className="w-5 h-5 text-gray-400 mt-1" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-700 leading-relaxed">
+                      {result.summary}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
         )}
 
         {/* Empty State */}
-        {searchStatus === 'idle' && (
-          <div className="text-center py-16">
-            <div className="max-w-2xl mx-auto">
-              <div className="text-6xl text-muted mb-6">
-                <Search className="mx-auto h-16 w-16" />
-              </div>
-              <h3 className="text-2xl font-semibold text-foreground mb-4">Start Your Research</h3>
-              <p className="text-lg text-muted-foreground mb-8">
-                Enter a search query above to find, scrape, and summarize the most relevant content from across the web.
-              </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
-                <div className="text-center">
-                  <div className="bg-primary/10 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                    <Search className="text-primary h-8 w-8" />
-                  </div>
-                  <h4 className="font-semibold text-foreground mb-2">Smart Search</h4>
-                  <p className="text-sm text-muted-foreground">Advanced search algorithms find the most relevant sources</p>
-                </div>
-                <div className="text-center">
-                  <div className="bg-orange-500/10 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                    <Worm className="text-orange-500 h-8 w-8" />
-                  </div>
-                  <h4 className="font-semibold text-foreground mb-2">Web Scraping</h4>
-                  <p className="text-sm text-muted-foreground">Extract content from multiple sources automatically</p>
-                </div>
-                <div className="text-center">
-                  <div className="bg-green-500/10 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                    <Brain className="text-green-500 h-8 w-8" />
-                  </div>
-                  <h4 className="font-semibold text-foreground mb-2">AI Summary</h4>
-                  <p className="text-sm text-muted-foreground">Generate concise, intelligent summaries of findings</p>
-                </div>
-              </div>
-            </div>
+        {!loading && !searchData && !error && (
+          <div className="text-center py-12">
+            <Search className="w-16 h-16 text-gray-300 mx-auto mb-6" />
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">Ready to research?</h3>
+            <p className="text-gray-500">
+              Enter any topic above to get comprehensive summaries from multiple web sources
+            </p>
           </div>
         )}
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-border mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="col-span-1 md:col-span-2">
-              <div className="flex items-center space-x-2 mb-4">
-                <Search className="text-primary h-6 w-6" />
-                <h3 className="text-xl font-semibold text-foreground">WebScrape Summarizer</h3>
-              </div>
-              <p className="text-muted-foreground max-w-md">
-                Intelligent web scraping and AI-powered summarization to help you research faster and smarter.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-foreground mb-4">Product</h4>
-              <ul className="space-y-2 text-muted-foreground">
-                <li><a href="#" className="hover:text-primary transition-colors">Features</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">API Documentation</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Changelog</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-foreground mb-4">Support</h4>
-              <ul className="space-y-2 text-muted-foreground">
-                <li><a href="#" className="hover:text-primary transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Contact Us</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Terms of Service</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-border mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
-            <p className="text-muted-foreground text-sm">
-              © 2024 WebScrape Summarizer. All rights reserved.
-            </p>
-            <div className="flex items-center space-x-4 mt-4 md:mt-0 text-sm text-muted-foreground">
-              <span>Status: <span className="text-green-500">All systems operational</span></span>
-              <span>API: <span className="text-green-500">99.9% uptime</span></span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      </div>
     </div>
   );
 }

@@ -90,6 +90,12 @@ This is a full-stack web application that allows users to search the web, scrape
 - **Workflows**: Automated startup with port waiting
 
 ## Recent Changes
+- July 2, 2025: Simplified application to core functionality:
+  - Streamlined UI to single search input and results view
+  - Removed complex navigation, loading states, and error handling components
+  - Consolidated frontend into single-page application with minimal UI
+  - Focused on core flow: search topic → find 5 URLs → scrape → summarize
+  - Clean card-based results display with essential information only
 - July 1, 2025: Enhanced OpenAI integration with comprehensive quota management:
   - Created new summarize.ts service with intelligent quota handling
   - Switched to gpt-3.5-turbo for cost optimization (from gpt-4o)
