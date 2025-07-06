@@ -50,6 +50,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter results to only show summaries with confidence scores greater than 80%
       const highConfidenceResults = allResults.filter(result => result.confidence > 80);
       
+      // Get the original URLs that were searched from cache
+      const searchedUrls = global.searchResultsCache?.[searchId] || [];
+
       res.json({
         search: {
           ...search,
@@ -57,6 +60,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           originalResultsCount: allResults.length
         },
         results: highConfidenceResults,
+        searchedUrls: searchedUrls,
       });
     } catch (error) {
       console.error("Get search error:", error);
@@ -94,6 +98,14 @@ async function processSearchAsync(searchId: number, query: string, startTime: nu
   try {
     // Step 1: Search the web
     const searchResults = await searchService.search(query, 10);
+    
+    // Store the original search URLs for later retrieval
+    global.searchResultsCache = global.searchResultsCache || {};
+    global.searchResultsCache[searchId] = searchResults.map(result => ({
+      title: result.title,
+      url: result.url,
+      domain: result.domain
+    }));
     
     if (searchResults.length === 0) {
       await storage.updateSearchStatus(searchId, 'error');

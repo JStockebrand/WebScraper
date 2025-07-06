@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Search, FileText, Loader2 } from "lucide-react";
+import { Search, FileText, Loader2, ExternalLink, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { apiRequest } from "@/lib/queryClient";
 
 interface SearchResult {
@@ -23,6 +24,11 @@ interface SearchData {
     originalResultsCount?: number;
   };
   results: SearchResult[];
+  searchedUrls?: Array<{
+    title: string;
+    url: string;
+    domain: string;
+  }>;
 }
 
 export default function Home() {
@@ -165,6 +171,48 @@ export default function Home() {
                   ` from ${searchData.search.originalResultsCount} sources`}
               </p>
             </div>
+
+            {/* Show searched URLs */}
+            {searchData.searchedUrls && searchData.searchedUrls.length > 0 && (
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <Button variant="outline" className="w-full">
+                    <List className="w-4 h-4 mr-2" />
+                    View All {searchData.searchedUrls.length} Searched URLs
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Sources Searched</CardTitle>
+                      <CardDescription>
+                        All {searchData.searchedUrls.length} URLs that were found and processed for this search
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {searchData.searchedUrls.map((url, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{url.title}</p>
+                              <p className="text-xs text-gray-500">{url.domain}</p>
+                            </div>
+                            <a
+                              href={url.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="ml-3 p-1 text-blue-600 hover:text-blue-800"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
 
             <div className="grid gap-6">
               {searchData.results.map((result, index) => (
