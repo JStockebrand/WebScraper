@@ -15,7 +15,7 @@ export class SearchService {
     }
   }
 
-  async search(query: string, limit: number = 5): Promise<SearchResult[]> {
+  async search(query: string, limit: number = 10): Promise<SearchResult[]> {
     if (!this.apiKey) {
       // Return mock data for development
       return this.getMockResults(query, limit);

@@ -20,6 +20,7 @@ interface SearchData {
     query: string;
     status: string;
     totalResults: number;
+    originalResultsCount?: number;
   };
   results: SearchResult[];
 }
@@ -93,7 +94,7 @@ export default function Home() {
             <Search className="h-8 w-8 text-blue-600 mr-2" />
             <h1 className="text-3xl font-bold text-gray-900">Web Research Tool</h1>
           </div>
-          <p className="text-gray-600">Enter any topic to get summaries from 5 relevant web sources</p>
+          <p className="text-gray-600">Enter any topic to get high-quality summaries (80%+ confidence) from web sources</p>
         </div>
 
         {/* Search Input */}
@@ -135,7 +136,7 @@ export default function Home() {
             <CardContent className="p-6 text-center">
               <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
               <h3 className="text-lg font-semibold mb-2">Researching your topic...</h3>
-              <p className="text-gray-600">Finding 5 relevant sources, scraping content, and generating summaries</p>
+              <p className="text-gray-600">Finding 10 relevant sources, scraping content, and filtering for high-quality summaries</p>
             </CardContent>
           </Card>
         )}
@@ -159,7 +160,9 @@ export default function Home() {
                 Research Summary: "{searchData.search.query}"
               </h2>
               <p className="text-gray-600">
-                Found {searchData.results.length} sources with summaries
+                Found {searchData.results.length} high-quality summaries (80%+ confidence)
+                {searchData.search.originalResultsCount && searchData.search.originalResultsCount > searchData.results.length && 
+                  ` from ${searchData.search.originalResultsCount} sources`}
               </p>
             </div>
 

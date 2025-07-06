@@ -45,11 +45,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Search not found" });
       }
 
-      const results = await storage.getSearchResults(searchId);
+      const allResults = await storage.getSearchResults(searchId);
+      
+      // Filter results to only show summaries with confidence scores greater than 80%
+      const highConfidenceResults = allResults.filter(result => result.confidence > 80);
       
       res.json({
-        search,
-        results,
+        search: {
+          ...search,
+          totalResults: highConfidenceResults.length,
+          originalResultsCount: allResults.length
+        },
+        results: highConfidenceResults,
       });
     } catch (error) {
       console.error("Get search error:", error);
@@ -86,7 +93,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 async function processSearchAsync(searchId: number, query: string, startTime: number) {
   try {
     // Step 1: Search the web
-    const searchResults = await searchService.search(query, 5);
+    const searchResults = await searchService.search(query, 10);
     
     if (searchResults.length === 0) {
       await storage.updateSearchStatus(searchId, 'error');

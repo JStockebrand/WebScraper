@@ -90,11 +90,16 @@ This is a full-stack web application that allows users to search the web, scrape
 - **Workflows**: Automated startup with port waiting
 
 ## Recent Changes
+- July 6, 2025: Enhanced search quality and filtering:
+  - Increased SerpAPI search from 5 to 10 URLs for broader coverage
+  - Added confidence-based filtering to only display summaries >80% confidence
+  - Updated scraper with improved content extraction and confidence scoring
+  - Enhanced UI to show filtered high-quality results count vs total sources
 - July 2, 2025: Simplified application to core functionality:
   - Streamlined UI to single search input and results view
   - Removed complex navigation, loading states, and error handling components
   - Consolidated frontend into single-page application with minimal UI
-  - Focused on core flow: search topic → find 5 URLs → scrape → summarize
+  - Focused on core flow: search topic → find URLs → scrape → summarize
   - Clean card-based results display with essential information only
 - July 1, 2025: Enhanced OpenAI integration with comprehensive quota management:
   - Created new summarize.ts service with intelligent quota handling
