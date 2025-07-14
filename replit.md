@@ -90,6 +90,14 @@ This is a full-stack web application that allows users to search the web, scrape
 - **Workflows**: Automated startup with port waiting
 
 ## Recent Changes
+- July 13, 2025: MAJOR OPTIMIZATION - Consolidated Summary Approach:
+  - Reduced OpenAI API calls from 10+ to just 1 per search (massive quota savings)
+  - All scraped content now combined into single comprehensive summary
+  - Enhanced summarizeService with new summarizeMultipleContent() method
+  - Updated routes.ts to use consolidated approach instead of individual summaries
+  - Frontend updated to reflect "consolidated analysis from X sources"
+  - Maintains same functionality while minimizing API quota impact
+  - Added consolidated fallback summary generation for quota exhaustion
 - July 11, 2025: Application prepared for deployment:
   - Verified complete functionality with search, scraping, and AI summarization
   - Cleaned up debug logs and optimized performance

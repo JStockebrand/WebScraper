@@ -148,56 +148,56 @@ async function processSearchAsync(searchId: number, query: string, startTime: nu
       });
     }
 
-    // Step 3: Only use OpenAI for successfully scraped content
+    // Step 3: Consolidate all successful scrapes into ONE OpenAI summary
     const successfulScrapes = scrapedResults.filter(r => r.scrapedContent && r.scrapedContent.length > 50);
-    console.log(`OpenAI optimization: Processing ${successfulScrapes.length}/${scrapedResults.length} results with AI (saving ${scrapedResults.length - successfulScrapes.length} API calls)`);
+    console.log(`🔥 OpenAI QUOTA OPTIMIZATION: Using ${successfulScrapes.length} sources for 1 consolidated summary (saving ${successfulScrapes.length - 1} API calls!)`);
     
-    // Process AI summaries efficiently
+    let consolidatedSummary = '';
+    let consolidatedConfidence = 0;
+    let consolidatedKeywords: string[] = [];
+    let consolidatedMetadata: { topic: string; category: string; entities: string[] } = { topic: 'Unknown', category: 'General', entities: [] };
+
+    if (successfulScrapes.length > 0) {
+      try {
+        // Create one comprehensive summary from all sources
+        const contentSources = successfulScrapes.map(scraped => ({
+          content: scraped.scrapedContent!,
+          title: scraped.searchResult.title,
+          url: scraped.searchResult.url,
+          domain: scraped.searchResult.domain
+        }));
+
+        const summaryResult = await summarizeService.summarizeMultipleContent(contentSources, query);
+        
+        consolidatedSummary = summaryResult.summary;
+        consolidatedConfidence = summaryResult.confidence;
+        consolidatedKeywords = summaryResult.keywords || [];
+        consolidatedMetadata = summaryResult.metadata || { topic: 'Unknown', category: 'General', entities: [] };
+      } catch (error) {
+        console.error(`Consolidated summary error:`, error);
+        consolidatedSummary = `Analysis of ${successfulScrapes.length} sources about ${query}`;
+        consolidatedConfidence = 40;
+      }
+    }
+
+    // Store individual results with shared consolidated summary
     for (const scraped of scrapedResults) {
       let summary = '';
       let confidence = 0;
-      let sourcesCount = 0;
-      let keywords: string[] = [];
-      let metadata: { topic: string; category: string; entities: string[] } = { topic: 'Unknown', category: 'General', entities: [] };
 
-      // Only call OpenAI if we have meaningful content
       if (scraped.scrapedContent && scraped.scrapedContent.length > 50) {
-        try {
-          const summaryResult = await summarizeService.summarizeContent(
-            scraped.scrapedContent,
-            scraped.searchResult.title,
-            scraped.searchResult.url
-          );
-          
-          summary = summaryResult.summary;
-          confidence = summaryResult.confidence;
-          sourcesCount = summaryResult.sourcesCount;
-          keywords = summaryResult.keywords || [];
-          metadata = summaryResult.metadata || { topic: 'Unknown', category: 'General', entities: [] };
-          
-          // Reduce confidence for partial scrapes
-          if (scraped.scrapingStatus === 'partial') {
-            confidence = Math.max(0, confidence - 30);
-          }
-        } catch (aiError) {
-          console.error(`AI summarization failed for ${scraped.searchResult.url}:`, aiError);
-          // Fallback to basic summary without using OpenAI quota
-          summary = scraped.scrapedContent.split(/[.!?]+/)
-            .filter(s => s.trim().length > 20)
-            .slice(0, 2)
-            .join('. ').trim() + '.';
-          confidence = scraped.scrapingStatus === 'success' ? 50 : 30;
-          sourcesCount = 0;
-          keywords = [];
-          metadata = { topic: 'Unknown', category: 'General', entities: [] } as { topic: string; category: string; entities: string[] };
+        // Use the consolidated summary for successful scrapes
+        summary = consolidatedSummary;
+        confidence = consolidatedConfidence;
+        
+        // Reduce confidence for partial scrapes
+        if (scraped.scrapingStatus === 'partial') {
+          confidence = Math.max(0, confidence - 20);
         }
       } else if (scraped.scrapingStatus === 'failed' && scraped.searchResult.snippet) {
         // Use snippet as basic summary for failed scrapes
         summary = scraped.searchResult.snippet;
         confidence = 20;
-        sourcesCount = 0;
-        keywords = [];
-        metadata = { topic: 'Unknown', category: 'General', entities: [] } as { topic: string; category: string; entities: string[] };
       }
 
       // Store result
@@ -211,9 +211,9 @@ async function processSearchAsync(searchId: number, query: string, startTime: nu
         scrapingStatus: scraped.scrapingStatus,
         summary,
         confidence,
-        sourcesCount,
-        keywords: JSON.stringify(keywords),
-        metadata: JSON.stringify(metadata),
+        sourcesCount: successfulScrapes.length,
+        keywords: JSON.stringify(consolidatedKeywords),
+        metadata: JSON.stringify(consolidatedMetadata),
         errorMessage: scraped.errorMessage,
       });
     }

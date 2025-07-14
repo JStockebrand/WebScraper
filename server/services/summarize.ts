@@ -40,6 +40,119 @@ export class SummarizeService {
   private quotaCheckTime = 0;
   private readonly QUOTA_COOLDOWN = 5 * 60 * 1000; // 5 minutes cooldown after quota exhaustion
 
+  async summarizeMultipleContent(
+    contentSources: Array<{
+      content: string;
+      title: string;
+      url: string;
+      domain: string;
+    }>,
+    searchQuery: string
+  ): Promise<SummaryResult> {
+    // Check if we should skip API calls due to recent quota exhaustion
+    if (this.shouldSkipApiCall()) {
+      this.logQuotaSkip();
+      return this.generateConsolidatedFallbackSummary(contentSources, searchQuery);
+    }
+
+    if (!openai.apiKey) {
+      this.logError("No OpenAI API key found", null);
+      return this.generateConsolidatedFallbackSummary(contentSources, searchQuery);
+    }
+
+    this.usageStats.totalRequests++;
+    const requestStartTime = Date.now();
+
+    try {
+      this.logConsolidatedApiRequest(searchQuery, contentSources);
+
+      // Combine all content with source attribution
+      const combinedContent = contentSources.map((source, index) => 
+        `--- Source ${index + 1}: ${source.title} (${source.domain}) ---\n${source.content.substring(0, 2000)}\n\n`
+      ).join('');
+
+      const prompt = `You are analyzing multiple web sources about "${searchQuery}". Please create a comprehensive, well-structured summary that synthesizes information from all sources.
+
+Search Query: ${searchQuery}
+Number of Sources: ${contentSources.length}
+
+Combined Content from ${contentSources.length} sources:
+${combinedContent.substring(0, 12000)}${combinedContent.length > 12000 ? '\n\n[Content truncated for length...]' : ''}
+
+Please provide:
+1. A comprehensive summary (4-6 sentences) that synthesizes the key information from ALL sources
+2. Highlight the main themes, findings, and perspectives
+3. Note any consensus or disagreements across sources
+4. Focus on the most important and relevant information related to "${searchQuery}"
+
+Also extract:
+- Your confidence in this consolidated summary (0-100)
+- Total number of distinct sources analyzed: ${contentSources.length}
+- 8-12 relevant keywords for the topic
+- Topic classification and main entities
+
+Respond with JSON in this format: {
+  "summary": "comprehensive synthesis of all sources...",
+  "confidence": 85,
+  "sourcesCount": ${contentSources.length},
+  "keywords": ["keyword1", "keyword2", ...],
+  "metadata": {
+    "topic": "main topic",
+    "category": "category",
+    "entities": ["entity1", "entity2", ...]
+  }
+}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert research analyst who synthesizes information from multiple sources to create comprehensive, accurate summaries. Always provide JSON responses."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.3
+      });
+
+      const duration = Date.now() - requestStartTime;
+      this.logApiSuccess(duration, response.usage);
+
+      const result = JSON.parse(response.choices[0].message.content || '{}');
+
+      return {
+        summary: result.summary || `Consolidated analysis of ${contentSources.length} sources about ${searchQuery}`,
+        confidence: Math.max(0, Math.min(100, result.confidence || 75)),
+        sourcesCount: contentSources.length,
+        keywords: Array.isArray(result.keywords) ? result.keywords.slice(0, 12) : this.extractKeywords(combinedContent, searchQuery),
+        metadata: result.metadata || this.extractMetadata(combinedContent, searchQuery, result.keywords || [])
+      };
+
+    } catch (error: any) {
+      const duration = Date.now() - requestStartTime;
+      
+      if (this.isQuotaError(error)) {
+        this.handleQuotaError(error, duration);
+        return this.generateConsolidatedFallbackSummary(contentSources, searchQuery);
+      }
+      
+      if (this.isRateLimitError(error)) {
+        this.handleRateLimitError(error, duration);
+        return this.generateConsolidatedFallbackSummary(contentSources, searchQuery);
+      }
+
+      this.logError("OpenAI API error", error, duration);
+      this.usageStats.failedRequests++;
+      this.usageStats.consecutiveFailures++;
+      
+      return this.generateConsolidatedFallbackSummary(contentSources, searchQuery);
+    }
+  }
+
   async summarizeContent(content: string, title: string, url: string): Promise<SummaryResult> {
     // Check if we should skip API calls due to recent quota exhaustion
     if (this.shouldSkipApiCall()) {
@@ -183,6 +296,16 @@ Respond with JSON in this format: {
     console.warn(`💡 Error details: ${error?.error?.message || error?.message}`);
   }
 
+  private logConsolidatedApiRequest(searchQuery: string, sources: Array<{title: string, url: string, content: string}>): void {
+    console.log(`🔄 Consolidated OpenAI API Request #${this.usageStats.totalRequests}`);
+    console.log(`🔍 Search Query: ${searchQuery}`);
+    console.log(`📚 Sources: ${sources.length} URLs`);
+    console.log(`📝 Total Content: ${sources.reduce((sum, s) => sum + s.content.length, 0)} chars`);
+    sources.forEach((source, i) => {
+      console.log(`  ${i + 1}. ${source.title.substring(0, 40)}${source.title.length > 40 ? '...' : ''} (${source.url.split('/')[2]})`);
+    });
+  }
+
   private logApiRequest(title: string, url: string, contentLength: number): void {
     console.log(`🔄 OpenAI API Request #${this.usageStats.totalRequests + 1}`);
     console.log(`📄 Title: ${title.substring(0, 50)}${title.length > 50 ? '...' : ''}`);
@@ -211,6 +334,33 @@ Respond with JSON in this format: {
   private logQuotaSkip(): void {
     const remainingCooldown = Math.ceil((this.QUOTA_COOLDOWN - (Date.now() - this.quotaCheckTime)) / 1000 / 60);
     console.log(`⏭️  Skipping OpenAI API call due to quota exhaustion (${remainingCooldown} min cooldown remaining)`);
+  }
+
+  private generateConsolidatedFallbackSummary(
+    contentSources: Array<{content: string, title: string, url: string, domain: string}>,
+    searchQuery: string
+  ): SummaryResult {
+    const allContent = contentSources.map(s => s.content).join(' ');
+    const allTitles = contentSources.map(s => s.title).join(', ');
+    
+    // Generate a consolidated summary using the fallback method
+    const sentences = allContent.split(/[.!?]+/).filter(s => s.trim().length > 20);
+    const topSentences = sentences
+      .slice(0, Math.min(15, sentences.length))
+      .filter(s => s.length > 30 && s.length < 200)
+      .slice(0, 5);
+    
+    const summary = topSentences.length > 0 
+      ? `Based on ${contentSources.length} sources about ${searchQuery}: ${topSentences.join('. ')}.`
+      : `Analysis of ${contentSources.length} sources covering various aspects of ${searchQuery}. The sources include information from ${contentSources.map(s => s.domain).join(', ')}.`;
+
+    return {
+      summary: summary.substring(0, 500),
+      confidence: Math.max(60, Math.min(80, 60 + (contentSources.length * 3))), // Higher confidence with more sources
+      sourcesCount: contentSources.length,
+      keywords: this.extractKeywords(allContent, searchQuery),
+      metadata: this.extractMetadata(allContent, searchQuery, this.extractKeywords(allContent, searchQuery))
+    };
   }
 
   private generateFallbackSummary(content: string, title: string): SummaryResult {

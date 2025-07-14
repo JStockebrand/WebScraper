@@ -142,7 +142,7 @@ export default function Home() {
             <CardContent className="p-6 text-center">
               <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
               <h3 className="text-lg font-semibold mb-2">Researching your topic...</h3>
-              <p className="text-gray-600">Finding 10 relevant sources, scraping content, and filtering for high-quality summaries</p>
+              <p className="text-gray-600">Finding 10 relevant sources, scraping content, and creating one comprehensive summary</p>
             </CardContent>
           </Card>
         )}
@@ -166,9 +166,7 @@ export default function Home() {
                 Research Summary: "{searchData.search.query}"
               </h2>
               <p className="text-gray-600">
-                Found {searchData.results.length} high-quality summaries (80%+ confidence)
-                {searchData.search.originalResultsCount && searchData.search.originalResultsCount > searchData.results.length && 
-                  ` from ${searchData.search.originalResultsCount} sources`}
+                Consolidated analysis from {searchData.results.length} sources - One comprehensive summary combining all findings
               </p>
             </div>
 
