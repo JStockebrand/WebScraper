@@ -276,6 +276,16 @@ export default function Home() {
                               {result.readingTime}
                             </Badge>
                           )}
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs ${
+                              result.confidence >= 80 ? 'bg-green-100 text-green-800' :
+                              result.confidence >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            {result.confidence}% confidence
+                          </Badge>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-3">
