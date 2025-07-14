@@ -212,50 +212,87 @@ export default function Home() {
               </Collapsible>
             )}
 
-            <div className="grid gap-6">
-              {searchData.results.map((result, index) => (
-                <Card key={index} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg mb-2">
-                          {result.title}
-                        </CardTitle>
-                        <CardDescription className="flex items-center gap-2 mb-2">
+            {/* Consolidated Summary */}
+            {searchData.results.length > 0 && (
+              <Card className="mb-6 border-blue-200 bg-blue-50">
+                <CardHeader>
+                  <CardTitle className="text-xl text-blue-900 flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Comprehensive Summary
+                  </CardTitle>
+                  <CardDescription className="text-blue-700">
+                    Consolidated analysis from {searchData.results.filter(r => r.scrapingStatus === 'success').length} successfully scraped sources
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-blue-900 leading-relaxed text-base">
+                    {searchData.results[0]?.summary || 'Summary not available'}
+                  </p>
+                  <div className="flex gap-2 mt-4">
+                    <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                      {searchData.results[0]?.confidence || 0}% confidence
+                    </Badge>
+                    <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                      {searchData.results.filter(r => r.scrapingStatus === 'success').length} sources
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Individual Source URLs */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Source URLs Processed</CardTitle>
+                <CardDescription>
+                  All {searchData.results.length} URLs found and processed for this search
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {searchData.results.map((result, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate mb-1">{result.title}</p>
+                        <div className="flex items-center gap-2 mb-2">
                           <a 
                             href={result.url} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline truncate"
+                            className="text-xs text-blue-600 hover:underline truncate"
                           >
                             {result.url}
                           </a>
-                        </CardDescription>
+                        </div>
                         <div className="flex gap-2">
-                          <Badge variant={result.scrapingStatus === 'success' ? 'default' : 'secondary'}>
+                          <Badge 
+                            variant={result.scrapingStatus === 'success' ? 'default' : 'secondary'}
+                            className="text-xs"
+                          >
                             {result.scrapingStatus}
                           </Badge>
                           {result.readingTime && (
-                            <Badge variant="outline">
+                            <Badge variant="outline" className="text-xs">
                               {result.readingTime}
                             </Badge>
                           )}
-                          <Badge variant="outline">
-                            {result.confidence}% confidence
-                          </Badge>
                         </div>
                       </div>
-                      <FileText className="w-5 h-5 text-gray-400 mt-1" />
+                      <div className="flex items-center gap-2 ml-3">
+                        <a
+                          href={result.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1 text-blue-600 hover:text-blue-800"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      </div>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-700 leading-relaxed">
-                      {result.summary}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
