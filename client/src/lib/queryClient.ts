@@ -8,19 +8,44 @@ async function throwIfResNotOk(res: Response) {
 }
 
 export async function apiRequest(
-  method: string,
   url: string,
-  data?: unknown | undefined,
+  options: RequestInit = {}
 ): Promise<Response> {
+  // Add auth token if available
+  const token = localStorage.getItem('supabase_token');
+  const headers: Record<string, string> = {};
+  
+  if (options.body) {
+    headers['Content-Type'] = 'application/json';
+  }
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
+    ...options,
+    headers: {
+      ...headers,
+      ...options.headers,
+    },
     credentials: "include",
   });
 
   await throwIfResNotOk(res);
   return res;
+}
+
+// Legacy method signature for backward compatibility
+export async function apiRequestLegacy(
+  method: string,
+  url: string,
+  data?: unknown | undefined,
+): Promise<Response> {
+  return apiRequest(url, {
+    method,
+    body: data ? JSON.stringify(data) : undefined,
+  });
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -29,7 +54,15 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const token = localStorage.getItem('supabase_token');
+    const headers: Record<string, string> = {};
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const res = await fetch(queryKey[0] as string, {
+      headers,
       credentials: "include",
     });
 

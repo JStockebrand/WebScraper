@@ -146,12 +146,13 @@ export class PgStorage implements IStorage {
   private db;
 
   constructor() {
-    // Use Supabase database URL if available, otherwise fallback to Replit's PostgreSQL
-    const databaseUrl = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
+    // Use Supabase connection string, fallback to DATABASE_URL
+    const databaseUrl = process.env.SUPABASE_CONNECTION_STRING || process.env.DATABASE_URL;
     if (!databaseUrl) {
-      throw new Error("No database URL available. Please set SUPABASE_DATABASE_URL secret.");
+      throw new Error("No database URL available. Please set SUPABASE_CONNECTION_STRING secret.");
     }
-    const sql = postgres(databaseUrl);
+    // Disable prefetch as it's not supported for Supabase's transaction pool mode
+    const sql = postgres(databaseUrl, { prepare: false });
     this.db = drizzle(sql);
   }
 
@@ -232,5 +233,5 @@ export class PgStorage implements IStorage {
   }
 }
 
-// Use PostgreSQL storage when SUPABASE_DATABASE_URL or DATABASE_URL is available, otherwise fallback to memory
-export const storage = (process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL) ? new PgStorage() : new MemStorage();
+// Use PostgreSQL storage when SUPABASE_CONNECTION_STRING or DATABASE_URL is available, otherwise fallback to memory
+export const storage = (process.env.SUPABASE_CONNECTION_STRING || process.env.DATABASE_URL) ? new PgStorage() : new MemStorage();
