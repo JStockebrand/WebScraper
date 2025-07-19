@@ -85,7 +85,12 @@ export class PgStorage implements IStorage {
   private db;
 
   constructor() {
-    const sql = postgres(process.env.DATABASE_URL!);
+    // Use Supabase database URL if available, otherwise fallback to Replit's PostgreSQL
+    const databaseUrl = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      throw new Error("No database URL available. Please set SUPABASE_DATABASE_URL secret.");
+    }
+    const sql = postgres(databaseUrl);
     this.db = drizzle(sql);
   }
 
@@ -122,5 +127,5 @@ export class PgStorage implements IStorage {
   }
 }
 
-// Use PostgreSQL storage when DATABASE_URL is available, otherwise fallback to memory
-export const storage = process.env.DATABASE_URL ? new PgStorage() : new MemStorage();
+// Use PostgreSQL storage when SUPABASE_DATABASE_URL or DATABASE_URL is available, otherwise fallback to memory
+export const storage = (process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL) ? new PgStorage() : new MemStorage();
