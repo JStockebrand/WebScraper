@@ -29,16 +29,28 @@ async function testSupabaseConnection() {
     return;
   }
   
-  // Check connection string format
-  console.log("Connection string format:", connectionString.substring(0, 30) + "...");
+  // Clean up the connection string
+  let cleanConnectionString = connectionString;
   
-  if (connectionString.includes("[") || connectionString.includes("]")) {
+  // Remove DATABASE_URL= prefix if present
+  if (cleanConnectionString.startsWith('DATABASE_URL=')) {
+    cleanConnectionString = cleanConnectionString.substring('DATABASE_URL='.length);
+  }
+  
+  // Remove extra quotes
+  if (cleanConnectionString.startsWith('"') && cleanConnectionString.endsWith('"')) {
+    cleanConnectionString = cleanConnectionString.slice(1, -1);
+  }
+  
+  console.log("Connection string format:", cleanConnectionString.substring(0, 30) + "...");
+  
+  if (cleanConnectionString.includes("[") || cleanConnectionString.includes("]")) {
     console.log("❌ Connection string contains placeholders");
     console.log("Please replace [YOUR-PASSWORD] with your actual database password");
     return;
   }
   
-  if (!connectionString.startsWith('postgresql://')) {
+  if (!cleanConnectionString.startsWith('postgresql://')) {
     console.log("❌ Connection string format is incorrect");
     console.log("Expected format: postgresql://postgres.xxx:password@aws-0-region.pooler.supabase.com:6543/postgres");
     return;
@@ -48,7 +60,7 @@ async function testSupabaseConnection() {
     console.log("✅ Connection string format looks correct");
     
     // Test database connection
-    const sql = postgres(connectionString, { 
+    const sql = postgres(cleanConnectionString, { 
       prepare: false,  // Required for Supabase transaction pooler
       connect_timeout: 10,
       idle_timeout: 20

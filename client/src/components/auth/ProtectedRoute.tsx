@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from 'wouter';
+import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
-  const [location] = useLocation();
+  const [, setLocation] = useLocation();
 
   if (loading) {
     return (
@@ -18,7 +18,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    setTimeout(() => setLocation('/auth'), 0);
+    return null;
   }
 
   return <>{children}</>;

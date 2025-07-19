@@ -90,6 +90,18 @@ This is a full-stack web application that allows users to search the web, scrape
 - **Workflows**: Automated startup with port waiting
 
 ## Recent Changes
+- July 19, 2025: COMPLETE SUPABASE INTEGRATION - User Authentication System:
+  - Implemented full user authentication with Supabase Auth
+  - Added user accounts with email/password registration and login
+  - Created comprehensive database schema: users, searches, search_results tables
+  - Implemented Row Level Security policies for data isolation
+  - Added subscription tiers (free: 10 searches/month, pro/premium for future)
+  - Protected all search endpoints with user authentication
+  - Added personal search history and usage tracking
+  - Created authentication context and protected routes in frontend
+  - Integrated user menu with subscription status and search quota display
+  - Added automatic user profile creation on signup
+  - Fixed connection string handling for Supabase PostgreSQL
 - July 13, 2025: MAJOR OPTIMIZATION - Consolidated Summary Approach:
   - Reduced OpenAI API calls from 10+ to just 1 per search (massive quota savings)
   - All scraped content now combined into single comprehensive summary

@@ -147,10 +147,22 @@ export class PgStorage implements IStorage {
 
   constructor() {
     // Use Supabase connection string, fallback to DATABASE_URL
-    const databaseUrl = process.env.SUPABASE_CONNECTION_STRING || process.env.DATABASE_URL;
+    let databaseUrl = process.env.SUPABASE_CONNECTION_STRING || process.env.DATABASE_URL;
+    
     if (!databaseUrl) {
       throw new Error("No database URL available. Please set SUPABASE_CONNECTION_STRING secret.");
     }
+    
+    // Clean up the connection string if it includes the env var name
+    if (databaseUrl.startsWith('DATABASE_URL=')) {
+      databaseUrl = databaseUrl.substring('DATABASE_URL='.length);
+    }
+    
+    // Remove any extra quotes
+    if (databaseUrl.startsWith('"') && databaseUrl.endsWith('"')) {
+      databaseUrl = databaseUrl.slice(1, -1);
+    }
+    
     // Disable prefetch as it's not supported for Supabase's transaction pool mode
     const sql = postgres(databaseUrl, { prepare: false });
     this.db = drizzle(sql);

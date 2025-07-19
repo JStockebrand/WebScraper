@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'wouter';
+import { useLocation } from 'wouter';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { RegisterForm } from '@/components/auth/RegisterForm';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const { user, loading } = useAuth();
+  const [, setLocation] = useLocation();
 
   if (loading) {
     return (
@@ -18,7 +19,8 @@ export function AuthPage() {
 
   // Redirect to home if already authenticated
   if (user) {
-    return <Navigate to="/" replace />;
+    setTimeout(() => setLocation('/'), 0);
+    return null;
   }
 
   const handleSuccess = () => {
