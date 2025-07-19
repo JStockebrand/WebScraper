@@ -1,4 +1,7 @@
 import { searches, searchResults, type Search, type InsertSearch, type SearchResult, type InsertSearchResult } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 
 export interface IStorage {
   createSearch(search: InsertSearch): Promise<Search>;
@@ -77,4 +80,47 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// PostgreSQL Storage implementation
+export class PgStorage implements IStorage {
+  private db;
+
+  constructor() {
+    const sql = postgres(process.env.DATABASE_URL!);
+    this.db = drizzle(sql);
+  }
+
+  async createSearch(insertSearch: InsertSearch): Promise<Search> {
+    const [search] = await this.db.insert(searches).values({
+      ...insertSearch,
+      status: 'searching',
+    }).returning();
+    return search;
+  }
+
+  async updateSearchStatus(id: number, status: string, totalResults?: number, searchTime?: number): Promise<void> {
+    await this.db.update(searches)
+      .set({
+        status,
+        ...(totalResults !== undefined && { totalResults }),
+        ...(searchTime !== undefined && { searchTime }),
+      })
+      .where(eq(searches.id, id));
+  }
+
+  async getSearch(id: number): Promise<Search | undefined> {
+    const [search] = await this.db.select().from(searches).where(eq(searches.id, id));
+    return search;
+  }
+
+  async createSearchResult(insertResult: InsertSearchResult): Promise<SearchResult> {
+    const [result] = await this.db.insert(searchResults).values(insertResult).returning();
+    return result;
+  }
+
+  async getSearchResults(searchId: number): Promise<SearchResult[]> {
+    return await this.db.select().from(searchResults).where(eq(searchResults.searchId, searchId));
+  }
+}
+
+// Use PostgreSQL storage when DATABASE_URL is available, otherwise fallback to memory
+export const storage = process.env.DATABASE_URL ? new PgStorage() : new MemStorage();
