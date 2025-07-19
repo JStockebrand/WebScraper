@@ -50,3 +50,5 @@ SELECT
 FROM information_schema.columns 
 WHERE table_name IN ('searches', 'search_results') 
 ORDER BY table_name, ordinal_position;
+SUPABASE_URL="https://csaksfdlssftgwobifis.supabase.co"
+SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNzYWtzZmRsc3NmdGd3b2JpZmlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI4MTExNTAsImV4cCI6MjA2ODM4NzE1MH0.u6hqHUxiLDMYx-0IyL4LtUAiHh5pyz0vo46qPmvxAqw'
