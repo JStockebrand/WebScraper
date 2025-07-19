@@ -1,27 +1,88 @@
-import { searches, searchResults, type Search, type InsertSearch, type SearchResult, type InsertSearchResult } from "@shared/schema";
+import { users, searches, searchResults, type User, type InsertUser, type Search, type InsertSearch, type SearchResult, type InsertSearchResult } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 export interface IStorage {
+  // User operations
+  createUser(user: InsertUser): Promise<User>;
+  getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  updateUser(id: string, updates: Partial<User>): Promise<void>;
+  updateUserSearchUsage(id: string, increment: number): Promise<void>;
+  
+  // Search operations
   createSearch(search: InsertSearch): Promise<Search>;
   updateSearchStatus(id: number, status: string, totalResults?: number, searchTime?: number): Promise<void>;
   getSearch(id: number): Promise<Search | undefined>;
+  getUserSearches(userId: string, limit?: number): Promise<Search[]>;
   createSearchResult(result: InsertSearchResult): Promise<SearchResult>;
   getSearchResults(searchId: number): Promise<SearchResult[]>;
 }
 
 export class MemStorage implements IStorage {
+  private users: Map<string, User>;
   private searches: Map<number, Search>;
   private searchResults: Map<number, SearchResult>;
   private currentSearchId: number;
   private currentResultId: number;
 
   constructor() {
+    this.users = new Map();
     this.searches = new Map();
     this.searchResults = new Map();
     this.currentSearchId = 1;
     this.currentResultId = 1;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const user: User = {
+      ...insertUser,
+      displayName: insertUser.displayName ?? null,
+      subscriptionTier: insertUser.subscriptionTier ?? 'free',
+      searchesUsed: 0,
+      searchesLimit: 10,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.users.set(user.id, user);
+    return user;
+  }
+
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.email === email);
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      const updatedUser = { ...user, ...updates, updatedAt: new Date() };
+      this.users.set(id, updatedUser);
+    }
+  }
+
+  async updateUserSearchUsage(id: string, increment: number): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      const updatedUser = { 
+        ...user, 
+        searchesUsed: user.searchesUsed + increment,
+        updatedAt: new Date()
+      };
+      this.users.set(id, updatedUser);
+    }
+  }
+
+  async getUserSearches(userId: string, limit?: number): Promise<Search[]> {
+    const userSearches = Array.from(this.searches.values())
+      .filter(search => search.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    
+    return limit ? userSearches.slice(0, limit) : userSearches;
   }
 
   async createSearch(insertSearch: InsertSearch): Promise<Search> {
@@ -92,6 +153,50 @@ export class PgStorage implements IStorage {
     }
     const sql = postgres(databaseUrl);
     this.db = drizzle(sql);
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await this.db.insert(users).values({
+      ...insertUser,
+      subscriptionTier: insertUser.subscriptionTier ?? 'free',
+    }).returning();
+    return user;
+  }
+
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await this.db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await this.db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<void> {
+    await this.db.update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, id));
+  }
+
+  async updateUserSearchUsage(id: string, increment: number): Promise<void> {
+    await this.db.update(users)
+      .set({
+        searchesUsed: users.searchesUsed + increment,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id));
+  }
+
+  async getUserSearches(userId: string, limit?: number): Promise<Search[]> {
+    const query = this.db.select().from(searches)
+      .where(eq(searches.userId, userId))
+      .orderBy(searches.createdAt);
+    
+    if (limit) {
+      return await query.limit(limit);
+    }
+    return await query;
   }
 
   async createSearch(insertSearch: InsertSearch): Promise<Search> {

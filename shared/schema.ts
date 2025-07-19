@@ -1,9 +1,23 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, varchar } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Users table - extends Supabase auth.users
+export const users = pgTable("users", {
+  id: text("id").primaryKey(), // Supabase auth user UUID
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  displayName: varchar("display_name", { length: 100 }),
+  subscriptionTier: varchar("subscription_tier", { length: 20 }).default("free"), // 'free', 'pro', 'premium'
+  searchesUsed: integer("searches_used").default(0),
+  searchesLimit: integer("searches_limit").default(10), // per month
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const searches = pgTable("searches", {
   id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(), // Foreign key to users.id
   query: text("query").notNull(),
   status: text("status").notNull(), // 'searching', 'completed', 'error'
   totalResults: integer("total_results").default(0),
@@ -28,7 +42,36 @@ export const searchResults = pgTable("search_results", {
   errorMessage: text("error_message"),
 });
 
+// Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  searches: many(searches),
+}));
+
+export const searchesRelations = relations(searches, ({ one, many }) => ({
+  user: one(users, {
+    fields: [searches.userId],
+    references: [users.id],
+  }),
+  results: many(searchResults),
+}));
+
+export const searchResultsRelations = relations(searchResults, ({ one }) => ({
+  search: one(searches, {
+    fields: [searchResults.searchId],
+    references: [searches.id],
+  }),
+}));
+
+// Insert schemas
+export const insertUserSchema = createInsertSchema(users).pick({
+  id: true,
+  email: true,
+  displayName: true,
+  subscriptionTier: true,
+});
+
 export const insertSearchSchema = createInsertSchema(searches).pick({
+  userId: true,
   query: true,
 });
 
@@ -48,7 +91,24 @@ export const insertSearchResultSchema = createInsertSchema(searchResults).pick({
   errorMessage: true,
 });
 
+// Authentication schemas
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
+
+export const registerSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+  displayName: z.string().min(2).optional(),
+});
+
+// Types
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertSearch = z.infer<typeof insertSearchSchema>;
 export type Search = typeof searches.$inferSelect;
 export type InsertSearchResult = z.infer<typeof insertSearchResultSchema>;
 export type SearchResult = typeof searchResults.$inferSelect;
+export type LoginData = z.infer<typeof loginSchema>;
+export type RegisterData = z.infer<typeof registerSchema>;

@@ -4,37 +4,111 @@ import { storage } from "./storage";
 import { searchService } from "./services/search";
 import { scraperService } from "./services/scraper";
 import { summarizeService } from "./services/summarize";
+import { authService } from "./services/supabase";
+import { authRoutes } from "./routes/auth";
 import { insertSearchSchema } from "@shared/schema";
 
+// Middleware to verify user authentication
+async function authenticateUser(req: any, res: any, next: any) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const authUser = await authService.verifySession(token);
+    
+    const user = await storage.getUser(authUser.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    req.user = user;
+    next();
+  } catch (error: any) {
+    console.error('Authentication error:', error);
+    res.status(401).json({ error: 'Invalid or expired session' });
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Start a new search
-  app.post("/api/search", async (req, res) => {
+  // Mount authentication routes
+  app.use("/api/auth", authRoutes);
+
+  // Start a new search (requires authentication)
+  app.post("/api/search", authenticateUser, async (req: any, res) => {
     try {
       const { query } = insertSearchSchema.parse(req.body);
+      const user = req.user;
       
       if (!query || query.trim().length === 0) {
         return res.status(400).json({ error: "Search query is required" });
       }
 
+      // Check if user has reached their search limit
+      if (user.searchesUsed >= user.searchesLimit) {
+        return res.status(429).json({ 
+          error: "Search limit reached", 
+          message: `You've used ${user.searchesUsed} of ${user.searchesLimit} searches this month. Upgrade your plan for more searches.`,
+          searchesUsed: user.searchesUsed,
+          searchesLimit: user.searchesLimit
+        });
+      }
+
       const startTime = Date.now();
       
-      // Create search record
-      const search = await storage.createSearch({ query: query.trim() });
+      // Create search record with user ID
+      const search = await storage.createSearch({ 
+        userId: user.id, 
+        query: query.trim() 
+      });
+      
+      // Increment user's search usage
+      await storage.updateUserSearchUsage(user.id, 1);
       
       // Perform search and processing asynchronously
       processSearchAsync(search.id, query.trim(), startTime);
       
-      res.json({ searchId: search.id, status: 'searching' });
+      res.json({ 
+        searchId: search.id, 
+        status: 'searching',
+        searchesUsed: user.searchesUsed + 1,
+        searchesLimit: user.searchesLimit
+      });
     } catch (error) {
       console.error("Search error:", error);
       res.status(500).json({ error: "Failed to start search" });
     }
   });
 
-  // Get search status and results
-  app.get("/api/search/:id", async (req, res) => {
+  // Get user's search history
+  app.get("/api/searches", authenticateUser, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const limit = parseInt(req.query.limit as string) || 20;
+      
+      const searches = await storage.getUserSearches(user.id, limit);
+      
+      res.json({
+        searches,
+        user: {
+          searchesUsed: user.searchesUsed,
+          searchesLimit: user.searchesLimit,
+          subscriptionTier: user.subscriptionTier
+        }
+      });
+    } catch (error) {
+      console.error("Get searches error:", error);
+      res.status(500).json({ error: "Failed to get search history" });
+    }
+  });
+
+  // Get search status and results (requires authentication)
+  app.get("/api/search/:id", authenticateUser, async (req: any, res) => {
     try {
       const searchId = parseInt(req.params.id);
+      const user = req.user;
       
       if (isNaN(searchId)) {
         return res.status(400).json({ error: "Invalid search ID" });
@@ -43,6 +117,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const search = await storage.getSearch(searchId);
       if (!search) {
         return res.status(404).json({ error: "Search not found" });
+      }
+
+      // Ensure user can only access their own searches
+      if (search.userId !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
       }
 
       const allResults = await storage.getSearchResults(searchId);
