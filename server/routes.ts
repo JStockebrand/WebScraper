@@ -147,7 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get OpenAI usage statistics
+  // Get OpenAI usage statistics (no auth required for public stats)
   app.get("/api/openai/stats", (req, res) => {
     try {
       const stats = summarizeService.getUsageStats();
@@ -158,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Reset OpenAI usage statistics (for development/testing)
+  // Reset OpenAI usage statistics (for development/testing only)
   app.post("/api/openai/reset-stats", (req, res) => {
     try {
       summarizeService.resetUsageStats();
@@ -167,6 +167,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Reset OpenAI stats error:", error);
       res.status(500).json({ error: "Failed to reset OpenAI usage statistics" });
     }
+  });
+
+  // Health check endpoint (no auth required)
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      message: "Web Research Tool API is running",
+      requiresAuth: true,
+      endpoints: {
+        "/api/search": "POST - Start new search (requires authentication)",
+        "/api/search/:id": "GET - Get search results (requires authentication)", 
+        "/api/searches": "GET - Get user search history (requires authentication)",
+        "/api/auth/*": "Authentication endpoints"
+      }
+    });
   });
 
   const httpServer = createServer(app);

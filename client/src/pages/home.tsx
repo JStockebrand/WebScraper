@@ -46,7 +46,7 @@ export default function Home() {
     
     // Check if user is authenticated for search functionality
     if (!user) {
-      setError('Please log in to use the search feature.');
+      setError('Please create a free account to start searching. Your search history and results will be saved to your personal account.');
       return;
     }
     
@@ -57,6 +57,11 @@ export default function Home() {
     try {
       // Get auth token for API request
       const token = localStorage.getItem('supabase_token');
+      
+      if (!token) {
+        setError('Please log in again to continue searching.');
+        return;
+      }
       
       // Start search
       const searchResponse = await fetch('/api/search', {
@@ -177,6 +182,9 @@ export default function Home() {
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-700">
                   <strong>Create a free account</strong> to start searching. Get 10 free searches per month with AI-powered summaries from multiple web sources.
+                </p>
+                <p className="text-xs text-blue-600 mt-2">
+                  🔒 Your search history and results are only saved when you're logged in to your account.
                 </p>
               </div>
             )}

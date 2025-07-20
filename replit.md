@@ -96,6 +96,9 @@ This is a full-stack web application that allows users to search the web, scrape
   - Enhanced password security requirements: 8+ characters, uppercase, number, special character
   - Search functionality still requires authentication but users can see the interface first
   - Maintained all existing authentication and subscription features
+  - PRIVACY PROTECTION: All search endpoints require authentication - no data is saved for non-logged-in users
+  - Added explicit messaging that search history and results are only saved when logged in
+  - Enhanced error messages to clarify authentication requirement for search functionality
 - July 19, 2025: COMPLETE SUPABASE INTEGRATION - User Authentication System:
   - Implemented full user authentication with Supabase Auth
   - Added user accounts with email/password registration and login
