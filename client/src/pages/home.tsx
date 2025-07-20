@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { Search, FileText, Loader2, ExternalLink, List } from "lucide-react";
+import { Search, FileText, Loader2, ExternalLink, List, User, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
+import { UserMenu } from "@/components/layout/UserMenu";
+import { Link } from "wouter";
 
 interface SearchResult {
   title: string;
@@ -36,6 +39,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [searchData, setSearchData] = useState<SearchData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -94,8 +98,28 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-4xl mx-auto">
+        {/* Top Navigation */}
+        <div className="flex justify-between items-center mb-8 pt-4">
+          <div className="flex items-center">
+            <Search className="h-6 w-6 text-blue-600 mr-2" />
+            <h2 className="text-xl font-semibold text-gray-900">Web Research Tool</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            {user ? (
+              <UserMenu />
+            ) : (
+              <Link href="/auth">
+                <Button variant="outline" className="flex items-center gap-2">
+                  <LogIn className="h-4 w-4" />
+                  Login
+                </Button>
+              </Link>
+            )}
+          </div>
+        </div>
+
         {/* Header */}
-        <div className="text-center mb-8 pt-8">
+        <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <Search className="h-8 w-8 text-blue-600 mr-2" />
             <h1 className="text-3xl font-bold text-gray-900">Web Research Tool</h1>
