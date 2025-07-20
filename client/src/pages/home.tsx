@@ -44,15 +44,27 @@ export default function Home() {
   const handleSearch = async () => {
     if (!query.trim()) return;
     
+    // Check if user is authenticated for search functionality
+    if (!user) {
+      setError('Please log in to use the search feature.');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     setSearchData(null);
 
     try {
+      // Get auth token for API request
+      const token = localStorage.getItem('supabase_token');
+      
       // Start search
       const searchResponse = await fetch('/api/search', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ query: query.trim() })
       });
 
@@ -65,7 +77,11 @@ export default function Home() {
       while (attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        const resultResponse = await fetch(`/api/search/${searchId}`);
+        const resultResponse = await fetch(`/api/search/${searchId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         const data = await resultResponse.json();
         
         if (data.search.status === 'completed') {
@@ -157,6 +173,13 @@ export default function Home() {
                 )}
               </Button>
             </div>
+            {!user && (
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Create a free account</strong> to start searching. Get 10 free searches per month with AI-powered summaries from multiple web sources.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

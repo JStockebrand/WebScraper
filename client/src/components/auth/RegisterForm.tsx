@@ -102,7 +102,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
             <Input
               id="password"
               type="password"
-              placeholder="At least 6 characters"
+              placeholder="8+ chars, 1 uppercase, 1 number, 1 symbol"
               {...form.register('password')}
               disabled={isLoading}
             />

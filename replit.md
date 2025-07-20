@@ -90,6 +90,12 @@ This is a full-stack web application that allows users to search the web, scrape
 - **Workflows**: Automated startup with port waiting
 
 ## Recent Changes
+- July 20, 2025: UPDATED USER EXPERIENCE - Homepage and Password Security:
+  - Made homepage accessible without login - search bar now visible to all visitors
+  - Added informational message prompting visitors to create account for search functionality
+  - Enhanced password security requirements: 8+ characters, uppercase, number, special character
+  - Search functionality still requires authentication but users can see the interface first
+  - Maintained all existing authentication and subscription features
 - July 19, 2025: COMPLETE SUPABASE INTEGRATION - User Authentication System:
   - Implemented full user authentication with Supabase Auth
   - Added user accounts with email/password registration and login
