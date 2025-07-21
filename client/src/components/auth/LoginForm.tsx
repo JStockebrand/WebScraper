@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 
 interface LoginFormProps {
-  onSuccess: (user: any, session: any) => void;
+  onSuccess: (email: string, password: string) => Promise<void>;
   onSwitchToRegister: () => void;
 }
 
@@ -29,27 +29,13 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
   const onSubmit = async (data: LoginData) => {
     try {
       setIsLoading(true);
-      const response = await apiRequest('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
       
-      if (!response.ok) {
-        throw new Error(result.error || 'Login failed');
-      }
-
-      // Store session token
-      localStorage.setItem('supabase_token', result.session.access_token);
+      await onSuccess(data.email, data.password);
       
       toast({
         title: 'Welcome back!',
         description: 'You have been signed in successfully.',
       });
-
-      onSuccess(result.user, result.session);
     } catch (error: any) {
       toast({
         title: 'Sign In Failed',

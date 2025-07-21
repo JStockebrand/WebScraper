@@ -15,8 +15,8 @@ interface AuthContextType {
   user: User | null;
   session: any | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName?: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ isNewUser: boolean }>;
+  signUp: (email: string, password: string, displayName?: string) => Promise<{ isNewUser: boolean }>;
   signOut: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
 }
@@ -92,6 +92,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.setItem('supabase_token', result.session.access_token);
     setUser(result.user);
     setSession(result.session);
+    
+    return { isNewUser: false }; // Existing user login
   };
 
   const signUp = async (email: string, password: string, displayName?: string) => {
@@ -110,6 +112,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.setItem('supabase_token', result.session.access_token);
     setUser(result.user);
     setSession(result.session);
+    
+    return { isNewUser: true }; // New user registration
   };
 
   const signOut = async () => {

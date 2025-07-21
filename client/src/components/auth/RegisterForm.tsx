@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 
 interface RegisterFormProps {
-  onSuccess: (user: any, session: any) => void;
+  onSuccess: (email: string, password: string, displayName?: string) => Promise<void>;
   onSwitchToLogin: () => void;
 }
 
@@ -30,27 +30,13 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
   const onSubmit = async (data: RegisterData) => {
     try {
       setIsLoading(true);
-      const response = await apiRequest('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
       
-      if (!response.ok) {
-        throw new Error(result.error || 'Registration failed');
-      }
-
-      // Store session token
-      localStorage.setItem('supabase_token', result.session.access_token);
+      await onSuccess(data.email, data.password, data.displayName);
       
       toast({
         title: 'Welcome!',
         description: 'Your account has been created successfully.',
       });
-
-      onSuccess(result.user, result.session);
     } catch (error: any) {
       toast({
         title: 'Registration Failed',

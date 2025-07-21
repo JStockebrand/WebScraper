@@ -169,6 +169,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user search history (requires authentication)
+  app.get("/api/searches/history", authenticateUser, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const searchHistory = await storage.getUserSearchHistory(user.id);
+      res.json(searchHistory);
+    } catch (error) {
+      console.error("Get search history error:", error);
+      res.status(500).json({ error: "Failed to get search history" });
+    }
+  });
+
   // Health check endpoint (no auth required)
   app.get("/api/health", (req, res) => {
     res.json({ 
@@ -178,7 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       endpoints: {
         "/api/search": "POST - Start new search (requires authentication)",
         "/api/search/:id": "GET - Get search results (requires authentication)", 
-        "/api/searches": "GET - Get user search history (requires authentication)",
+        "/api/searches/history": "GET - Get user search history (requires authentication)",
         "/api/auth/*": "Authentication endpoints"
       }
     });

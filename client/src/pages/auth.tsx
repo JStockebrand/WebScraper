@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
-  const { user, loading } = useAuth();
+  const { user, loading, signIn, signUp } = useAuth();
   const [, setLocation] = useLocation();
 
   if (loading) {
@@ -23,8 +23,24 @@ export function AuthPage() {
     return null;
   }
 
-  const handleSuccess = () => {
-    // Navigation will be handled by the auth context update
+  const handleLoginSuccess = async (email: string, password: string) => {
+    try {
+      const result = await signIn(email, password);
+      // Existing users go to account page
+      setLocation('/account');
+    } catch (error) {
+      throw error; // Let the form handle the error
+    }
+  };
+
+  const handleRegisterSuccess = async (email: string, password: string, displayName?: string) => {
+    try {
+      const result = await signUp(email, password, displayName);
+      // New users go to homepage
+      setLocation('/');
+    } catch (error) {
+      throw error; // Let the form handle the error
+    }
   };
 
   return (
@@ -32,12 +48,12 @@ export function AuthPage() {
       <div className="w-full max-w-md">
         {isLogin ? (
           <LoginForm
-            onSuccess={handleSuccess}
+            onSuccess={handleLoginSuccess}
             onSwitchToRegister={() => setIsLogin(false)}
           />
         ) : (
           <RegisterForm
-            onSuccess={handleSuccess}
+            onSuccess={handleRegisterSuccess}
             onSwitchToLogin={() => setIsLogin(true)}
           />
         )}

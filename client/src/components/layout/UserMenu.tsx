@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { LogOut, User, Search, Settings } from 'lucide-react';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 export function UserMenu() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
 
   if (!user) return null;
@@ -107,9 +109,9 @@ export function UserMenu() {
 
         <DropdownMenuSeparator />
         
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setLocation('/account')}>
           <User className="mr-2 h-4 w-4" />
-          <span>Profile</span>
+          <span>Account & History</span>
         </DropdownMenuItem>
         <DropdownMenuItem>
           <Settings className="mr-2 h-4 w-4" />

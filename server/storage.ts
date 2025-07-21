@@ -1,5 +1,5 @@
 import { users, searches, searchResults, type User, type InsertUser, type Search, type InsertSearch, type SearchResult, type InsertSearchResult } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
@@ -16,6 +16,7 @@ export interface IStorage {
   updateSearchStatus(id: number, status: string, totalResults?: number, searchTime?: number): Promise<void>;
   getSearch(id: number): Promise<Search | undefined>;
   getUserSearches(userId: string, limit?: number): Promise<Search[]>;
+  getUserSearchHistory(userId: string, limit?: number): Promise<any[]>;
   createSearchResult(result: InsertSearchResult): Promise<SearchResult>;
   getSearchResults(searchId: number): Promise<SearchResult[]>;
 }
@@ -70,7 +71,7 @@ export class MemStorage implements IStorage {
     if (user) {
       const updatedUser = { 
         ...user, 
-        searchesUsed: user.searchesUsed + increment,
+        searchesUsed: (user.searchesUsed || 0) + increment,
         updatedAt: new Date()
       };
       this.users.set(id, updatedUser);
@@ -80,7 +81,7 @@ export class MemStorage implements IStorage {
   async getUserSearches(userId: string, limit?: number): Promise<Search[]> {
     const userSearches = Array.from(this.searches.values())
       .filter(search => search.userId === userId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
     
     return limit ? userSearches.slice(0, limit) : userSearches;
   }
@@ -139,6 +140,26 @@ export class MemStorage implements IStorage {
       (result) => result.searchId === searchId,
     );
   }
+
+  async getUserSearchHistory(userId: string, limit?: number): Promise<any[]> {
+    const userSearches = await this.getUserSearches(userId, limit);
+    return userSearches.map(search => {
+      const results = Array.from(this.searchResults.values()).filter(
+        result => result.searchId === search.id
+      );
+      const firstResult = results[0];
+      
+      return {
+        id: search.id,
+        query: search.query,
+        status: search.status,
+        createdAt: search.createdAt?.toISOString() || new Date().toISOString(),
+        summaryText: firstResult?.summary || null,
+        totalResults: search.totalResults,
+        confidence: firstResult?.confidence || null,
+      };
+    });
+  }
 }
 
 // PostgreSQL Storage implementation
@@ -193,18 +214,22 @@ export class PgStorage implements IStorage {
   }
 
   async updateUserSearchUsage(id: string, increment: number): Promise<void> {
-    await this.db.update(users)
-      .set({
-        searchesUsed: users.searchesUsed + increment,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, id));
+    // Get current user to calculate new value
+    const user = await this.getUser(id);
+    if (user) {
+      await this.db.update(users)
+        .set({
+          searchesUsed: (user.searchesUsed || 0) + increment,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, id));
+    }
   }
 
   async getUserSearches(userId: string, limit?: number): Promise<Search[]> {
     const query = this.db.select().from(searches)
       .where(eq(searches.userId, userId))
-      .orderBy(searches.createdAt);
+      .orderBy(desc(searches.createdAt));
     
     if (limit) {
       return await query.limit(limit);
@@ -242,6 +267,43 @@ export class PgStorage implements IStorage {
 
   async getSearchResults(searchId: number): Promise<SearchResult[]> {
     return await this.db.select().from(searchResults).where(eq(searchResults.searchId, searchId));
+  }
+
+  async getUserSearchHistory(userId: string, limit?: number): Promise<any[]> {
+    const query = this.db
+      .select({
+        id: searches.id,
+        query: searches.query,
+        status: searches.status,
+        createdAt: searches.createdAt,
+        totalResults: searches.totalResults,
+        summary: searchResults.summary,
+        confidence: searchResults.confidence,
+      })
+      .from(searches)
+      .leftJoin(searchResults, eq(searches.id, searchResults.searchId))
+      .where(eq(searches.userId, userId))
+      .orderBy(desc(searches.createdAt));
+
+    const results = limit ? await query.limit(limit) : await query;
+    
+    // Group by search ID and return with first result's summary
+    const groupedResults = results.reduce((acc, row) => {
+      if (!acc[row.id]) {
+        acc[row.id] = {
+          id: row.id,
+          query: row.query,
+          status: row.status,
+          createdAt: row.createdAt?.toISOString() || new Date().toISOString(),
+          summaryText: row.summary || null,
+          totalResults: row.totalResults,
+          confidence: row.confidence || null,
+        };
+      }
+      return acc;
+    }, {} as any);
+
+    return Object.values(groupedResults);
   }
 }
 
