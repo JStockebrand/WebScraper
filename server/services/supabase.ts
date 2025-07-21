@@ -8,6 +8,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please set SUPABASE_URL and SUPABASE_ANON_KEY.');
 }
 
+console.log('Supabase config:', {
+  url: supabaseUrl?.substring(0, 30) + '...',
+  keyLength: supabaseAnonKey?.length,
+  urlStartsWithHttps: supabaseUrl?.startsWith('https://'),
+});
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Authentication service
