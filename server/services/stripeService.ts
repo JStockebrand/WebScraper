@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { storage } from '../storage';
+import { userSyncService } from './userSync';
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
@@ -113,15 +114,16 @@ export class StripeService {
 
         const plan = SUBSCRIPTION_PLANS[planType];
 
-        // Update user with subscription details
-        await storage.updateUser(userId, {
+        // Update user with subscription details using sync service
+        await userSyncService.syncSubscriptionStatus(userId, {
           stripeCustomerId: session.customer as string,
           stripeSubscriptionId: subscription.id,
           subscriptionTier: planType,
           subscriptionStatus: 'active',
           searchesLimit: plan.searchLimit,
-          updatedAt: new Date(),
         });
+
+        console.log(`User subscription fulfilled - User: ${userId}, Plan: ${planType}, Status: active, Stripe Customer: ${session.customer}, Subscription: ${subscription.id}`);
 
         console.log(`Successfully fulfilled subscription for user ${userId}, plan: ${planType}`);
         return { 

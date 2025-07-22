@@ -42,6 +42,9 @@ export class MemStorage implements IStorage {
       ...insertUser,
       displayName: insertUser.displayName ?? null,
       subscriptionTier: insertUser.subscriptionTier ?? 'free',
+      subscriptionStatus: 'inactive',
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
       searchesUsed: 0,
       searchesLimit: 10,
       createdAt: new Date(),
@@ -194,6 +197,11 @@ export class PgStorage implements IStorage {
     const [user] = await this.db.insert(users).values({
       ...insertUser,
       subscriptionTier: insertUser.subscriptionTier ?? 'free',
+      subscriptionStatus: 'inactive',
+      searchesUsed: 0,
+      searchesLimit: 10,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     }).returning();
     return user;
   }
@@ -317,18 +325,7 @@ export class PgStorage implements IStorage {
       .where(eq(users.id, id));
   }
 
-  async updateUserStripeInfo(id: string, customerId: string, subscriptionId: string): Promise<void> {
-    const user = this.users.get(id);
-    if (user) {
-      const updatedUser = { 
-        ...user, 
-        stripeCustomerId: customerId,
-        stripeSubscriptionId: subscriptionId,
-        updatedAt: new Date()
-      };
-      this.users.set(id, updatedUser);
-    }
-  }
+
 }
 
 // Use PostgreSQL storage when SUPABASE_CONNECTION_STRING or DATABASE_URL is available, otherwise fallback to memory

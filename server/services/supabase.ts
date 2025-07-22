@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { storage } from '../storage';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -9,7 +10,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Supabase client is configured and ready
-
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Authentication service
@@ -31,6 +31,22 @@ export class AuthService {
       throw new Error(`Registration failed: ${error.message}`);
     }
 
+    // Create user profile in our database
+    if (data.user) {
+      try {
+        await storage.createUser({
+          id: data.user.id,
+          email: data.user.email!,
+          displayName: displayName || data.user.user_metadata?.display_name || data.user.email!.split('@')[0],
+          subscriptionTier: 'free',
+        });
+        console.log(`Created user profile: ${data.user.email} (${data.user.id})`);
+      } catch (dbError: any) {
+        console.error('Failed to create user profile:', dbError);
+        // Don't throw here as auth user was created successfully
+      }
+    }
+
     return data;
   }
 
@@ -43,6 +59,27 @@ export class AuthService {
 
     if (error) {
       throw new Error(`Sign in failed: ${error.message}`);
+    }
+
+    // Ensure user profile exists in our database
+    if (data.user) {
+      try {
+        let user = await storage.getUser(data.user.id);
+        if (!user) {
+          // Create profile if it doesn't exist (for existing auth users)
+          await storage.createUser({
+            id: data.user.id,
+            email: data.user.email!,
+            displayName: data.user.user_metadata?.display_name || data.user.email!.split('@')[0],
+            subscriptionTier: 'free',
+          });
+          console.log(`Created user profile for existing auth user: ${data.user.email} (${data.user.id})`);
+        } else {
+          console.log(`User profile already exists: ${data.user.email} (${data.user.id})`);
+        }
+      } catch (dbError: any) {
+        console.error('Failed to sync user profile:', dbError);
+      }
     }
 
     return data;
