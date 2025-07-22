@@ -10,20 +10,37 @@ router.post('/register', async (req, res) => {
   try {
     const { email, password, displayName }: RegisterData = registerSchema.parse(req.body);
     
-    // Register with Supabase Auth
+    // Register with Supabase Auth (also creates user profile in database)
     const authResponse = await authService.register(email, password, displayName);
     
     if (!authResponse.user) {
       return res.status(400).json({ error: 'Registration failed' });
     }
 
-    // Create user record in our database
-    const user = await storage.createUser({
-      id: authResponse.user.id,
-      email: authResponse.user.email!,
-      displayName: displayName || authResponse.user.email!.split('@')[0],
-      subscriptionTier: 'free',
-    });
+    // Get the user record from our database (created by authService.register)
+    const user = await storage.getUser(authResponse.user.id);
+    
+    if (!user) {
+      // Fallback: create user record if it doesn't exist
+      const newUser = await storage.createUser({
+        id: authResponse.user.id,
+        email: authResponse.user.email!,
+        displayName: displayName || authResponse.user.email!.split('@')[0],
+        subscriptionTier: 'free',
+      });
+      
+      return res.json({
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          displayName: newUser.displayName,
+          subscriptionTier: newUser.subscriptionTier,
+          searchesUsed: newUser.searchesUsed,
+          searchesLimit: newUser.searchesLimit,
+        },
+        session: authResponse.session,
+      });
+    }
 
     res.json({
       user: {
@@ -38,7 +55,30 @@ router.post('/register', async (req, res) => {
     });
   } catch (error: any) {
     console.error('Registration error:', error);
-    res.status(400).json({ error: error.message });
+    
+    // Handle specific errors with user-friendly messages
+    if (error.message?.includes('User already registered') || 
+        error.message?.includes('already exists') ||
+        error.message?.includes('duplicate key value violates unique constraint')) {
+      return res.status(409).json({ 
+        error: 'An account with this email already exists. Please try signing in instead or use the "Forgot password?" option if you need to reset your password.' 
+      });
+    }
+    
+    // Handle Zod validation errors
+    if (error.issues && Array.isArray(error.issues)) {
+      const passwordErrors = error.issues.filter((issue: any) => issue.path?.includes('password'));
+      if (passwordErrors.length > 0) {
+        return res.status(400).json({ 
+          error: 'Password does not meet requirements. Please ensure it has 8+ characters, uppercase, lowercase, number, and special character.' 
+        });
+      }
+      return res.status(400).json({ error: 'Please check your information and try again.' });
+    }
+    
+    res.status(400).json({ 
+      error: error.message || 'Registration failed. Please check your information and try again.' 
+    });
   }
 });
 

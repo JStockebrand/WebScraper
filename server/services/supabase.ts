@@ -31,16 +31,21 @@ export class AuthService {
       throw new Error(`Registration failed: ${error.message}`);
     }
 
-    // Create user profile in our database
+    // Create user profile in our database (or get existing one)
     if (data.user) {
       try {
-        await storage.createUser({
-          id: data.user.id,
-          email: data.user.email!,
-          displayName: displayName || data.user.user_metadata?.display_name || data.user.email!.split('@')[0],
-          subscriptionTier: 'free',
-        });
-        console.log(`Created user profile: ${data.user.email} (${data.user.id})`);
+        const existingUser = await storage.getUser(data.user.id);
+        if (!existingUser) {
+          await storage.createUser({
+            id: data.user.id,
+            email: data.user.email!,
+            displayName: displayName || data.user.user_metadata?.display_name || data.user.email!.split('@')[0],
+            subscriptionTier: 'free',
+          });
+          console.log(`Created user profile: ${data.user.email} (${data.user.id})`);
+        } else {
+          console.log(`User profile already exists: ${data.user.email} (${data.user.id})`);
+        }
       } catch (dbError: any) {
         console.error('Failed to create user profile:', dbError);
         // Don't throw here as auth user was created successfully
