@@ -88,10 +88,20 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
             <Input
               id="password"
               type="password"
-              placeholder="8+ chars, 1 uppercase, 1 number, 1 symbol"
+              placeholder="Enter a secure password"
               {...form.register('password')}
               disabled={isLoading}
             />
+            <div className="text-xs text-gray-600 dark:text-gray-400">
+              Password must contain:
+              <ul className="list-disc list-inside ml-2 mt-1">
+                <li>At least 8 characters</li>
+                <li>One uppercase letter</li>
+                <li>One lowercase letter</li>
+                <li>One number</li>
+                <li>One special character (!@#$%^&*)</li>
+              </ul>
+            </div>
             {form.formState.errors.password && (
               <p className="text-sm text-red-500">{form.formState.errors.password.message}</p>
             )}
