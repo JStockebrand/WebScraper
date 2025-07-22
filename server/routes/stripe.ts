@@ -35,8 +35,8 @@ export function registerStripeRoutes(app: Express) {
     });
   });
 
-  // Create subscription payment intent
-  app.post("/api/stripe/create-subscription", authenticateUser, async (req: any, res) => {
+  // Create Checkout Session for subscription
+  app.post("/api/stripe/create-checkout-session", authenticateUser, async (req: any, res) => {
     try {
       const { planType } = req.body;
       const user = req.user;
@@ -45,16 +45,56 @@ export function registerStripeRoutes(app: Express) {
         return res.status(400).json({ error: 'Invalid plan type' });
       }
 
-      const result = await stripeService.createSubscriptionPaymentIntent(user.id, planType);
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? `https://${req.get('host')}` 
+        : `http://${req.get('host')}`;
+      
+      const successUrl = `${baseUrl}/subscribe?success=true&session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${baseUrl}/subscribe?canceled=true`;
+
+      const session = await stripeService.createCheckoutSession(
+        user.id, 
+        planType, 
+        successUrl, 
+        cancelUrl
+      );
       
       res.json({
-        clientSecret: result.clientSecret,
-        subscriptionId: result.subscriptionId,
-        customerId: result.customerId,
+        sessionId: session.id,
+        url: session.url,
       });
     } catch (error: any) {
-      console.error('Create subscription error:', error);
-      res.status(500).json({ error: error.message || 'Failed to create subscription' });
+      console.error('Create checkout session error:', error);
+      res.status(500).json({ error: error.message || 'Failed to create checkout session' });
+    }
+  });
+
+  // Handle successful checkout (called from success redirect)
+  app.post("/api/stripe/fulfill-checkout", authenticateUser, async (req: any, res) => {
+    try {
+      const { sessionId } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ error: 'Session ID required' });
+      }
+
+      const result = await stripeService.fulfillCheckout(sessionId);
+      
+      if (result.success) {
+        res.json({ 
+          success: true, 
+          message: result.alreadyFulfilled ? 'Already fulfilled' : 'Subscription activated successfully',
+          planType: result.planType
+        });
+      } else {
+        res.status(400).json({ 
+          success: false, 
+          error: result.reason || 'Fulfillment failed' 
+        });
+      }
+    } catch (error: any) {
+      console.error('Fulfill checkout error:', error);
+      res.status(500).json({ error: error.message || 'Failed to fulfill checkout' });
     }
   });
 
@@ -116,25 +156,67 @@ export function registerStripeRoutes(app: Express) {
     }
   });
 
-  // Stripe webhook endpoint (for production)
+  // Stripe webhook endpoint for automatic fulfillment
   app.post("/api/stripe/webhook", async (req, res) => {
-    try {
-      // In production, you should verify the webhook signature
-      const event = req.body;
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    
+    if (!endpointSecret) {
+      console.warn('STRIPE_WEBHOOK_SECRET not set, webhook signature verification disabled');
+    }
 
+    try {
+      let event = req.body;
+
+      // Verify webhook signature in production
+      if (endpointSecret) {
+        const sig = req.headers['stripe-signature'] as string;
+        
+        try {
+          event = stripe.webhooks.constructEvent(req.rawBody || req.body, sig, endpointSecret);
+        } catch (err: any) {
+          console.error('Webhook signature verification failed:', err.message);
+          return res.status(400).json({ error: 'Webhook signature verification failed' });
+        }
+      }
+
+      // Handle the event
       switch (event.type) {
+        case 'checkout.session.completed':
+          console.log('Checkout session completed:', event.data.object.id);
+          try {
+            await stripeService.fulfillCheckout(event.data.object.id);
+          } catch (error: any) {
+            console.error('Error fulfilling checkout from webhook:', error);
+          }
+          break;
+          
+        case 'checkout.session.async_payment_succeeded':
+          console.log('Async payment succeeded:', event.data.object.id);
+          try {
+            await stripeService.fulfillCheckout(event.data.object.id);
+          } catch (error: any) {
+            console.error('Error fulfilling async payment from webhook:', error);
+          }
+          break;
+          
+        case 'checkout.session.async_payment_failed':
+          console.log('Async payment failed:', event.data.object.id);
+          // TODO: Send email to customer about failed payment
+          break;
+          
         case 'invoice.payment_succeeded':
-          // Handle successful payment
-          console.log('Payment succeeded:', event.data.object.id);
+          console.log('Invoice payment succeeded:', event.data.object.id);
           break;
+          
         case 'invoice.payment_failed':
-          // Handle failed payment
-          console.log('Payment failed:', event.data.object.id);
+          console.log('Invoice payment failed:', event.data.object.id);
           break;
+          
         case 'customer.subscription.deleted':
-          // Handle subscription cancellation
           console.log('Subscription cancelled:', event.data.object.id);
+          // TODO: Update user subscription status to cancelled
           break;
+          
         default:
           console.log(`Unhandled event type: ${event.type}`);
       }

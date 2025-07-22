@@ -50,6 +50,109 @@ export class StripeService {
     return customer;
   }
 
+  // Create Checkout Session for subscription
+  async createCheckoutSession(userId: string, planType: 'pro' | 'premium', successUrl: string, cancelUrl: string) {
+    const user = await storage.getUser(userId);
+    if (!user) throw new Error('User not found');
+
+    const customer = await this.getOrCreateCustomer(userId, user.email, user.displayName || undefined);
+    const plan = SUBSCRIPTION_PLANS[planType];
+
+    const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: plan.stripePriceId,
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: {
+        userId,
+        planType,
+      },
+    });
+
+    return session;
+  }
+
+  // Fulfill checkout session (called by webhook and redirect)
+  async fulfillCheckout(sessionId: string) {
+    console.log(`Fulfilling Checkout Session ${sessionId}`);
+
+    try {
+      // Check if already fulfilled to prevent duplicate processing
+      const existingUser = await this.getCheckoutSessionUser(sessionId);
+      if (existingUser && existingUser.subscriptionStatus === 'active') {
+        console.log(`Session ${sessionId} already fulfilled`);
+        return { success: true, alreadyFulfilled: true };
+      }
+
+      // Retrieve the Checkout Session with line_items expanded
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ['line_items', 'subscription'],
+      });
+
+      // Check payment status
+      if (session.payment_status === 'unpaid') {
+        console.log(`Session ${sessionId} payment still pending`);
+        return { success: false, reason: 'payment_pending' };
+      }
+
+      if (session.payment_status === 'paid' && session.subscription) {
+        const subscription = session.subscription as Stripe.Subscription;
+        const userId = session.metadata?.userId;
+        const planType = session.metadata?.planType as 'pro' | 'premium';
+
+        if (!userId || !planType) {
+          throw new Error('Missing user ID or plan type in session metadata');
+        }
+
+        const plan = SUBSCRIPTION_PLANS[planType];
+
+        // Update user with subscription details
+        await storage.updateUser(userId, {
+          stripeCustomerId: session.customer as string,
+          stripeSubscriptionId: subscription.id,
+          subscriptionTier: planType,
+          subscriptionStatus: 'active',
+          searchesLimit: plan.searchLimit,
+          updatedAt: new Date(),
+        });
+
+        console.log(`Successfully fulfilled subscription for user ${userId}, plan: ${planType}`);
+        return { 
+          success: true, 
+          userId, 
+          planType, 
+          subscriptionId: subscription.id 
+        };
+      }
+
+      return { success: false, reason: 'invalid_payment_status' };
+    } catch (error: any) {
+      console.error(`Error fulfilling checkout session ${sessionId}:`, error);
+      throw error;
+    }
+  }
+
+  // Helper method to get user from checkout session
+  private async getCheckoutSessionUser(sessionId: string) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      const userId = session.metadata?.userId;
+      if (userId) {
+        return await storage.getUser(userId);
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   // Create subscription for a user
   async createSubscription(userId: string, planType: 'pro' | 'premium') {
     const user = await storage.getUser(userId);

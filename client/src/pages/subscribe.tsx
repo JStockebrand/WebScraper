@@ -1,20 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useStripe, Elements, PaymentElement, useElements } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { useLocation } from 'wouter';
-
-// Load Stripe
-if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
-  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
-}
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 interface SubscriptionPlan {
   name: string;
@@ -38,95 +30,28 @@ const PLANS: Record<string, SubscriptionPlan> = {
   },
 };
 
-function SubscribeForm({ planType, clientSecret }: { planType: string; clientSecret: string }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const { toast } = useToast();
-  const { updateUser } = useAuth();
-  const [, setLocation] = useLocation();
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!stripe || !elements) {
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const { error, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: `${window.location.origin}/account`,
-        },
-        redirect: 'if_required',
-      });
-
-      if (error) {
-        toast({
-          title: "Payment Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else if (paymentIntent?.status === 'succeeded') {
-        // Confirm payment on backend
-        await apiRequest('/api/stripe/confirm-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            subscriptionId: paymentIntent.metadata?.subscriptionId 
-          }),
-        });
-
-        toast({
-          title: "Subscription Activated!",
-          description: `Welcome to ${PLANS[planType].name}! Your subscription is now active.`,
-        });
-
-        // Refresh user data
-        const plan = PLANS[planType];
-        updateUser({
-          subscriptionTier: planType,
-          searchesLimit: plan.searchLimit,
-        });
-
-        setLocation('/account');
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "An error occurred during payment processing.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+function SuccessMessage({ planType }: { planType: string }) {
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <PaymentElement />
-      <Button 
-        type="submit" 
-        disabled={!stripe || !elements || isLoading}
-        className="w-full"
-      >
-        {isLoading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Processing...
-          </>
-        ) : (
-          `Subscribe to ${PLANS[planType].name} - $${PLANS[planType].price}/month`
-        )}
-      </Button>
-    </form>
+    <Card className="max-w-2xl mx-auto">
+      <CardContent className="pt-6">
+        <div className="text-center space-y-4">
+          <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
+          <h2 className="text-2xl font-bold text-green-700 dark:text-green-300">
+            Subscription Activated!
+          </h2>
+          <p className="text-muted-foreground">
+            Welcome to {PLANS[planType].name}! Your subscription is now active and you have access to {PLANS[planType].searchLimit} searches per month.
+          </p>
+          <Button onClick={() => window.location.href = '/account'}>
+            Go to Account
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
-function PlanSelector({ onSelectPlan }: { onSelectPlan: (plan: string) => void }) {
+function PlanSelector({ onSelectPlan, loading }: { onSelectPlan: (plan: string) => void; loading: boolean }) {
   return (
     <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
       {Object.entries(PLANS).map(([key, plan]) => (
@@ -159,8 +84,16 @@ function PlanSelector({ onSelectPlan }: { onSelectPlan: (plan: string) => void }
               onClick={() => onSelectPlan(key)}
               className="w-full"
               variant={key === 'premium' ? 'default' : 'outline'}
+              disabled={loading}
             >
-              Choose {plan.name}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                `Choose ${plan.name}`
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -170,12 +103,26 @@ function PlanSelector({ onSelectPlan }: { onSelectPlan: (plan: string) => void }
 }
 
 export function SubscribePage() {
-  const { user } = useAuth();
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [clientSecret, setClientSecret] = useState<string>("");
+  const { user, updateUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+
+  // Check URL parameters for success/canceled
+  const urlParams = new URLSearchParams(window.location.search);
+  const success = urlParams.get('success');
+  const canceled = urlParams.get('canceled');
+  const sessionId = urlParams.get('session_id');
+  const [planType, setPlanType] = useState<string>('');
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  // Handle successful payment
+  useEffect(() => {
+    if (success === 'true' && sessionId && !isSuccess) {
+      setIsSuccess(true);
+      handleSuccessfulPayment(sessionId);
+    }
+  }, [success, sessionId]);
 
   // Redirect if not authenticated
   if (!user) {
@@ -183,10 +130,48 @@ export function SubscribePage() {
     return null;
   }
 
+  const handleSuccessfulPayment = async (sessionId: string) => {
+    try {
+      const response = await apiRequest('/api/stripe/fulfill-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setPlanType(data.planType);
+        
+        // Update user context
+        const plan = PLANS[data.planType];
+        updateUser({
+          subscriptionTier: data.planType,
+          searchesLimit: plan.searchLimit,
+          subscriptionStatus: 'active',
+        });
+
+        toast({
+          title: "Success!",
+          description: `Your ${plan.name} subscription is now active!`,
+        });
+      } else {
+        throw new Error(data.error || 'Failed to activate subscription');
+      }
+    } catch (error: any) {
+      console.error('Error fulfilling checkout:', error);
+      toast({
+        title: "Error",
+        description: error.message || "There was an issue activating your subscription. Please contact support.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSelectPlan = async (planType: string) => {
     setLoading(true);
     try {
-      const response = await apiRequest('/api/stripe/create-subscription', {
+      const response = await apiRequest('/api/stripe/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ planType }),
@@ -195,65 +180,63 @@ export function SubscribePage() {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create subscription');
+        throw new Error(data.error || 'Failed to create checkout session');
       }
 
-      setClientSecret(data.clientSecret);
-      setSelectedPlan(planType);
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to initiate subscription process.",
+        description: error.message || "Failed to initiate checkout process.",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
+  // Show success message if payment was successful
+  if (success === 'true' && planType) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p>Setting up your subscription...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4">
+        <SuccessMessage planType={planType} />
       </div>
     );
   }
 
-  if (!selectedPlan || !clientSecret) {
+  // Show canceled message if payment was canceled
+  if (canceled === 'true') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold mb-4">Choose Your Plan</h1>
-            <p className="text-xl text-muted-foreground">
-              Upgrade your research capabilities with more searches and advanced features
-            </p>
-          </div>
-          <PlanSelector onSelectPlan={handleSelectPlan} />
-        </div>
+        <Card className="max-w-2xl mx-auto">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <h2 className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                Payment Canceled
+              </h2>
+              <p className="text-muted-foreground">
+                Your payment was canceled. You can try again anytime.
+              </p>
+              <Button onClick={() => window.location.href = '/subscribe'}>
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4">
-      <div className="max-w-2xl mx-auto">
-        <Card>
-          <CardHeader>
-            <CardTitle>Complete Your Subscription</CardTitle>
-            <p className="text-muted-foreground">
-              You're subscribing to {PLANS[selectedPlan].name} - ${PLANS[selectedPlan].price}/month
-            </p>
-          </CardHeader>
-          <CardContent>
-            <Elements stripe={stripePromise} options={{ clientSecret }}>
-              <SubscribeForm planType={selectedPlan} clientSecret={clientSecret} />
-            </Elements>
-          </CardContent>
-        </Card>
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold mb-4">Choose Your Plan</h1>
+          <p className="text-xl text-muted-foreground">
+            Upgrade your research capabilities with more searches and advanced features
+          </p>
+        </div>
+        <PlanSelector onSelectPlan={handleSelectPlan} loading={loading} />
       </div>
     </div>
   );
