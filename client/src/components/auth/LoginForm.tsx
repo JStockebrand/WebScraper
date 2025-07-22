@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import { ForgotPasswordDialog } from './ForgotPasswordDialog';
 
 interface LoginFormProps {
   onSuccess: (email: string, password: string) => Promise<void>;
@@ -16,6 +17,7 @@ interface LoginFormProps {
 
 export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { toast } = useToast();
   
   const form = useForm<LoginData>({
@@ -88,7 +90,16 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
         </form>
 
         <div className="text-center space-y-2">
-          <p className="text-sm text-gray-600">
+          <button
+            type="button"
+            onClick={() => setShowForgotPassword(true)}
+            className="text-sm text-blue-600 hover:underline font-medium"
+            disabled={isLoading}
+          >
+            Forgot password?
+          </button>
+          
+          <p className="text-sm text-gray-600 dark:text-gray-300">
             Don't have an account?{' '}
             <button
               onClick={onSwitchToRegister}
@@ -98,6 +109,11 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
             </button>
           </p>
         </div>
+        
+        <ForgotPasswordDialog 
+          open={showForgotPassword}
+          onOpenChange={setShowForgotPassword}
+        />
       </CardContent>
     </Card>
   );

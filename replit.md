@@ -90,6 +90,14 @@ This is a full-stack web application that allows users to search the web, scrape
 - **Workflows**: Automated startup with port waiting
 
 ## Recent Changes
+- July 22, 2025: FORGOT PASSWORD FUNCTIONALITY - Complete Implementation:
+  - Added "Forgot password?" link to the login form for easy access
+  - Created popup dialog with email entry form for password reset requests
+  - Implemented secure password reset flow using Supabase Auth
+  - Added email validation and user-friendly error handling
+  - Created confirmation screen with instructions after reset email is sent
+  - Enhanced login form with forgot password integration and improved UX
+  - Password reset emails include secure reset links with automatic redirect handling
 - July 22, 2025: ENHANCED USER DATA CAPTURE - Complete Supabase Integration:
   - Enhanced user data synchronization ensuring all users have profiles in Supabase tables
   - Comprehensive user sync service managing email, subscription status, and Stripe data

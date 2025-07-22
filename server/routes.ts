@@ -200,6 +200,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Forgot password endpoint
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: 'Please enter a valid email address' });
+      }
+
+      // Use Supabase auth service to send reset email
+      const { authService } = await import('./services/supabase');
+      await authService.resetPassword(email);
+
+      res.json({ 
+        success: true,
+        message: 'Password reset email sent. Please check your inbox and spam folder.' 
+      });
+    } catch (error: any) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ 
+        error: 'Failed to send password reset email. Please try again later.' 
+      });
+    }
+  });
+
   // Test endpoint to verify user data capture for all users
   app.get("/api/admin/user-data-verification", async (req, res) => {
     try {
