@@ -9,6 +9,9 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   displayName: varchar("display_name", { length: 100 }),
   subscriptionTier: varchar("subscription_tier", { length: 20 }).default("free"), // 'free', 'pro', 'premium'
+  subscriptionStatus: varchar("subscription_status", { length: 20 }).default("inactive"), // active, inactive, cancelled, past_due
+  stripeCustomerId: varchar("stripe_customer_id", { length: 100 }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
   searchesUsed: integer("searches_used").default(0),
   searchesLimit: integer("searches_limit").default(10), // per month
   createdAt: timestamp("created_at").defaultNow(),

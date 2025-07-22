@@ -35,6 +35,10 @@ async function authenticateUser(req: any, res: any, next: any) {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Mount authentication routes
   app.use("/api/auth", authRoutes);
+  
+  // Import and register Stripe routes
+  const { registerStripeRoutes } = await import("./routes/stripe");
+  registerStripeRoutes(app);
 
   // Start a new search (requires authentication)
   app.post("/api/search", authenticateUser, async (req: any, res) => {

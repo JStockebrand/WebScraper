@@ -90,6 +90,18 @@ This is a full-stack web application that allows users to search the web, scrape
 - **Workflows**: Automated startup with port waiting
 
 ## Recent Changes
+- July 22, 2025: STRIPE PAYMENT INTEGRATION - Complete Subscription System:
+  - Implemented full Stripe payment processing with subscription tiers
+  - Added Pro ($9.99/month, 100 searches) and Premium ($19.99/month, 500 searches) plans
+  - Created secure payment flow with Stripe Elements for card processing
+  - Built subscription management (create, cancel, view details)
+  - Added comprehensive Stripe service layer with customer/subscription handling
+  - Updated database schema with Stripe customer and subscription tracking
+  - Created dedicated subscription page (/subscribe) with plan selection
+  - Enhanced user menu with "Upgrade Plan" option
+  - Integrated payment confirmation and subscription activation
+  - Added comprehensive testing guide for safe development testing
+  - All payments in TEST MODE for safe development and testing
 - July 20, 2025: UPDATED USER EXPERIENCE - Homepage and Password Security:
   - Made homepage accessible without login - search bar now visible to all visitors
   - Added informational message prompting visitors to create account for search functionality

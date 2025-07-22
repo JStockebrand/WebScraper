@@ -10,6 +10,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   updateUser(id: string, updates: Partial<User>): Promise<void>;
   updateUserSearchUsage(id: string, increment: number): Promise<void>;
+  updateUserStripeInfo(id: string, customerId: string, subscriptionId: string): Promise<void>;
   
   // Search operations
   createSearch(search: InsertSearch): Promise<Search>;
@@ -304,6 +305,29 @@ export class PgStorage implements IStorage {
     }, {} as any);
 
     return Object.values(groupedResults);
+  }
+
+  async updateUserStripeInfo(id: string, customerId: string, subscriptionId: string): Promise<void> {
+    await this.db.update(users)
+      .set({
+        stripeCustomerId: customerId,
+        stripeSubscriptionId: subscriptionId,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id));
+  }
+
+  async updateUserStripeInfo(id: string, customerId: string, subscriptionId: string): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      const updatedUser = { 
+        ...user, 
+        stripeCustomerId: customerId,
+        stripeSubscriptionId: subscriptionId,
+        updatedAt: new Date()
+      };
+      this.users.set(id, updatedUser);
+    }
   }
 }
 

@@ -113,9 +113,9 @@ export function UserMenu() {
           <User className="mr-2 h-4 w-4" />
           <span>Account & History</span>
         </DropdownMenuItem>
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setLocation('/subscribe')}>
           <Settings className="mr-2 h-4 w-4" />
-          <span>Settings</span>
+          <span>Upgrade Plan</span>
         </DropdownMenuItem>
         
         <DropdownMenuSeparator />
