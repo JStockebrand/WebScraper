@@ -231,6 +231,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update password endpoint
+  app.post("/api/auth/update-password", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'No authorization token provided' });
+      }
+
+      const { newPassword } = req.body;
+      
+      if (!newPassword || newPassword.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+      }
+
+      const { authService } = await import('./services/supabase');
+      await authService.updatePassword(newPassword);
+
+      res.json({ 
+        success: true,
+        message: 'Password updated successfully' 
+      });
+    } catch (error: any) {
+      console.error('Password update error:', error);
+      res.status(500).json({ 
+        error: 'Failed to update password. Please try again later.' 
+      });
+    }
+  });
+
   // Test endpoint to verify user data capture for all users
   app.get("/api/admin/user-data-verification", async (req, res) => {
     try {
