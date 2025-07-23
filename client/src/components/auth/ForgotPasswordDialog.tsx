@@ -82,6 +82,10 @@ export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialo
             <DialogTitle className="text-center">Check Your Email</DialogTitle>
             <DialogDescription className="text-center">
               We've sent password reset instructions to <strong>{email}</strong>
+              <br />
+              <small className="text-muted-foreground mt-2 block">
+                Note: Password reset is only available for verified email addresses
+              </small>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -109,6 +113,10 @@ export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialo
           <DialogTitle>Forgot Password?</DialogTitle>
           <DialogDescription>
             Enter your email address and we'll send you instructions to reset your password.
+            <br />
+            <small className="text-muted-foreground mt-2 block">
+              Note: Password reset is only available for verified email addresses.
+            </small>
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">

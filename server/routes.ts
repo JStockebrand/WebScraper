@@ -215,16 +215,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Please enter a valid email address' });
       }
 
-      // Use Supabase auth service to send reset email
-      const { authService } = await import('./services/supabase');
-      await authService.resetPassword(email);
+      // Check if user exists in our database first
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal whether user exists or not for security
+        return res.json({ 
+          success: true,
+          message: 'If an account with this email exists and is verified, you will receive password reset instructions.' 
+        });
+      }
 
-      res.json({ 
-        success: true,
-        message: 'Password reset email sent. Please check your inbox and spam folder.' 
-      });
+      try {
+        // Use Supabase auth service to send reset email
+        const { authService } = await import('./services/supabase');
+        await authService.resetPassword(email);
+
+        res.json({ 
+          success: true,
+          message: 'Password reset email sent. Please check your inbox and spam folder.' 
+        });
+      } catch (resetError: any) {
+        // Handle email not confirmed or user not found in Supabase auth
+        if (resetError.message?.includes('User not found or email not confirmed')) {
+          return res.json({ 
+            success: true,
+            message: 'Password reset is only available for verified email addresses. Please check that you have confirmed your email address first, or contact support if you need help.' 
+          });
+        }
+        throw resetError; // Re-throw other errors
+      }
     } catch (error: any) {
       console.error('Forgot password error:', error);
+      
+      // Handle specific Supabase errors - email not confirmed or user not found
+      if (error.message?.includes('User not found or email not confirmed') || 
+          (error.message?.includes('Email address') && error.message?.includes('invalid'))) {
+        return res.json({ 
+          success: true,
+          message: 'Password reset is only available for verified email addresses. Please check that you have confirmed your email address first, or contact support if you need help.' 
+        });
+      }
+      
       res.status(500).json({ 
         error: 'Failed to send password reset email. Please try again later.' 
       });

@@ -98,14 +98,16 @@ This is a full-stack web application that allows users to search the web, scrape
   - Server-side validation properly enforces all password security rules with user-friendly error messages
   - Cleared conflicting test data and improved database handling for smooth user registration
   - Registration system now fully functional with both weak password rejection and strong password acceptance
-- July 22, 2025: FORGOT PASSWORD FUNCTIONALITY - Complete Implementation:
+- July 22, 2025: FORGOT PASSWORD FUNCTIONALITY - Implementation with Email Verification Requirement:
   - Added "Forgot password?" link to the login form for easy access
   - Created popup dialog with email entry form for password reset requests
   - Implemented secure password reset flow using Supabase Auth
-  - Added email validation and user-friendly error handling
-  - Created confirmation screen with instructions after reset email is sent
+  - Added comprehensive error handling for unverified email addresses
+  - Created confirmation screen with verification requirements messaging
   - Enhanced login form with forgot password integration and improved UX
-  - Password reset emails include secure reset links with automatic redirect handling
+  - **IMPORTANT**: Password reset requires email verification - Supabase only sends reset emails to confirmed addresses
+  - Added clear messaging to users about email verification requirement
+  - Implemented graceful fallback messaging for security when emails are unverified
 - July 22, 2025: ENHANCED USER DATA CAPTURE - Complete Supabase Integration:
   - Enhanced user data synchronization ensuring all users have profiles in Supabase tables
   - Comprehensive user sync service managing email, subscription status, and Stripe data

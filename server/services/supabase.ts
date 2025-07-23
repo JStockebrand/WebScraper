@@ -123,13 +123,47 @@ export class AuthService {
 
   // Reset password
   async resetPassword(email: string) {
+    console.log(`Attempting password reset for: ${email}`);
+    
+    // First, try to find the user in Supabase auth
+    try {
+      const { data: users, error: listError } = await supabase.auth.admin.listUsers();
+      if (listError) {
+        console.error('Error listing users:', listError);
+      } else {
+        const user = users?.users?.find(u => u.email === email);
+        console.log(`User found in Supabase:`, user ? 'Yes' : 'No');
+        if (user) {
+          console.log(`User email confirmed:`, user.email_confirmed_at ? 'Yes' : 'No');
+        }
+      }
+    } catch (adminError) {
+      console.log('Could not access admin users (this is expected with anon key)');
+    }
+    
+    const redirectUrl = `${process.env.SITE_URL || 'http://localhost:5000'}/reset-password`;
+    console.log(`Redirect URL: ${redirectUrl}`);
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/reset-password`,
+      redirectTo: redirectUrl,
     });
 
     if (error) {
+      console.error('Supabase reset password error:', {
+        message: error.message,
+        status: error.status,
+        statusCode: error.status
+      });
+      
+      // Check if it's a user not found error vs other issues
+      if (error.message?.includes('Invalid') || error.message?.includes('invalid')) {
+        throw new Error('User not found or email not confirmed');
+      }
+      
       throw new Error(`Password reset failed: ${error.message}`);
     }
+    
+    console.log('Password reset email sent successfully');
   }
 
   // Update password
