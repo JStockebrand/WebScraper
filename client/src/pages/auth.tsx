@@ -1,13 +1,31 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { RegisterForm } from '@/components/auth/RegisterForm';
+import { EmailVerificationDialog } from '@/components/auth/EmailVerificationDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 export function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
+  const [showEmailVerification, setShowEmailVerification] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
   const { user, loading, signIn, signUp } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  // Check for email verification success
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('verified') === 'true') {
+      toast({
+        title: "Email Verified!",
+        description: "Your email has been verified. You can now sign in to your account.",
+      });
+      // Clear the URL parameter
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [toast]);
 
   if (loading) {
     return (
@@ -36,11 +54,27 @@ export function AuthPage() {
   const handleRegisterSuccess = async (email: string, password: string, displayName?: string) => {
     try {
       const result = await signUp(email, password, displayName);
-      // New users go to homepage
-      setLocation('/');
+      
+      // Check if email verification is required
+      if (result?.emailVerificationRequired) {
+        setVerificationEmail(email);
+        setShowEmailVerification(true);
+      } else {
+        // Registration complete - user can login
+        setLocation('/');
+      }
     } catch (error) {
       throw error; // Let the form handle the error
     }
+  };
+
+  const handleVerificationComplete = () => {
+    setShowEmailVerification(false);
+    setIsLogin(true); // Switch to login form
+    toast({
+      title: "Verification Complete!",
+      description: "You can now sign in with your email and password.",
+    });
   };
 
   return (
@@ -58,6 +92,13 @@ export function AuthPage() {
           />
         )}
       </div>
+      
+      <EmailVerificationDialog
+        open={showEmailVerification}
+        onOpenChange={setShowEmailVerification}
+        email={verificationEmail}
+        onVerificationComplete={handleVerificationComplete}
+      />
     </div>
   );
 }

@@ -23,7 +23,8 @@ export class AuthService {
       options: {
         data: {
           display_name: displayName || email.split('@')[0],
-        }
+        },
+        emailRedirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth?verified=true`
       }
     });
 
@@ -164,6 +165,26 @@ export class AuthService {
     }
     
     console.log('Password reset email sent successfully');
+  }
+
+  // Resend email verification
+  async resendVerification(email: string) {
+    console.log(`Resending verification email for: ${email}`);
+    
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+      options: {
+        emailRedirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth?verified=true`
+      }
+    });
+
+    if (error) {
+      console.error('Supabase resend verification error:', error);
+      throw new Error(`Resend verification failed: ${error.message}`);
+    }
+    
+    console.log('Verification email resent successfully');
   }
 
   // Update password

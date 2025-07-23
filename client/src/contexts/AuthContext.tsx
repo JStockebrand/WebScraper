@@ -109,11 +109,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       throw new Error(result.error || 'Sign up failed');
     }
 
+    // Check if email verification is required
+    if (result.emailVerificationRequired) {
+      return { 
+        isNewUser: true, 
+        emailVerificationRequired: true,
+        email: result.email,
+        message: result.message
+      };
+    }
+
+    // Registration complete with session
     localStorage.setItem('supabase_token', result.session.access_token);
     setUser(result.user);
     setSession(result.session);
     
-    return { isNewUser: true }; // New user registration
+    return { isNewUser: true }; // New user registration complete
   };
 
   const signOut = async () => {

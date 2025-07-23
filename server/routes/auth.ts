@@ -17,6 +17,16 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Registration failed' });
     }
 
+    // Check if email verification is required
+    if (!authResponse.session) {
+      // User needs to verify email before getting a session
+      return res.json({
+        message: 'Registration successful! Please check your email and click the verification link to complete your account setup.',
+        emailVerificationRequired: true,
+        email: authResponse.user.email,
+      });
+    }
+
     // Get the user record from our database (created by authService.register)
     const user = await storage.getUser(authResponse.user.id);
     

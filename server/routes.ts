@@ -354,6 +354,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Resend email verification
+  app.post("/api/auth/resend-verification", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: 'Please enter a valid email address' });
+      }
+
+      // Use Supabase auth service to resend verification
+      const { authService } = await import('./services/supabase');
+      await authService.resendVerification(email);
+
+      res.json({ 
+        success: true,
+        message: 'Verification email sent. Please check your inbox.' 
+      });
+    } catch (error: any) {
+      console.error('Resend verification error:', error);
+      res.status(500).json({ 
+        error: 'Failed to resend verification email. Please try again later.' 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
