@@ -32,39 +32,39 @@ export class AuthService {
       throw new Error(`Registration failed: ${error.message}`);
     }
 
+    if (!data.user) {
+      throw new Error('Registration failed: No user data returned');
+    }
+
     // For demo purposes, simulate email verification requirement
     // In production, Supabase would be configured to require verification
     console.log('Registration successful, simulating email verification requirement for:', data.user.email);
     
+    // Create user profile in our database first
+    try {
+      const existingUser = await storage.getUser(data.user.id);
+      if (!existingUser) {
+        await storage.createUser({
+          id: data.user.id,
+          email: data.user.email!,
+          displayName: displayName || data.user.user_metadata?.display_name || data.user.email!.split('@')[0],
+          subscriptionTier: 'free',
+        });
+        console.log(`Created user profile: ${data.user.email} (${data.user.id})`);
+      } else {
+        console.log(`User profile already exists: ${data.user.email} (${data.user.id})`);
+      }
+    } catch (dbError: any) {
+      console.error('Failed to create user profile:', dbError);
+      // Don't throw here as auth user was created successfully
+    }
+
     // Return user data but no session to demonstrate verification flow
     return { 
       user: data.user, 
       session: null,
       needsVerification: true 
     };
-
-    // Create user profile in our database (or get existing one)
-    if (data.user) {
-      try {
-        const existingUser = await storage.getUser(data.user.id);
-        if (!existingUser) {
-          await storage.createUser({
-            id: data.user.id,
-            email: data.user.email!,
-            displayName: displayName || data.user.user_metadata?.display_name || data.user.email!.split('@')[0],
-            subscriptionTier: 'free',
-          });
-          console.log(`Created user profile: ${data.user.email} (${data.user.id})`);
-        } else {
-          console.log(`User profile already exists: ${data.user.email} (${data.user.id})`);
-        }
-      } catch (dbError: any) {
-        console.error('Failed to create user profile:', dbError);
-        // Don't throw here as auth user was created successfully
-      }
-    }
-
-    return data;
   }
 
   // Sign in user
