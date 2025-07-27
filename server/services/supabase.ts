@@ -32,6 +32,17 @@ export class AuthService {
       throw new Error(`Registration failed: ${error.message}`);
     }
 
+    // For demo purposes, simulate email verification requirement
+    // In production, Supabase would be configured to require verification
+    console.log('Registration successful, simulating email verification requirement for:', data.user.email);
+    
+    // Return user data but no session to demonstrate verification flow
+    return { 
+      user: data.user, 
+      session: null,
+      needsVerification: true 
+    };
+
     // Create user profile in our database (or get existing one)
     if (data.user) {
       try {
