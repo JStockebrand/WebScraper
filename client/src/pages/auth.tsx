@@ -55,8 +55,8 @@ export function AuthPage() {
     try {
       const result = await signUp(email, password, displayName);
       
-      // Check if email verification is required
-      if (result?.emailVerificationRequired) {
+      // Check if email verification is required  
+      if ((result as any)?.emailVerificationRequired) {
         setVerificationEmail(email);
         setShowEmailVerification(true);
       } else {

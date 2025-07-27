@@ -29,6 +29,15 @@ export class AuthService {
     });
 
     if (error) {
+      console.error('Supabase registration error:', error);
+      
+      // Handle specific Supabase errors
+      if (error.message?.includes('User already registered') || 
+          error.message?.includes('duplicate key value') ||
+          error.message?.includes('already exists')) {
+        throw new Error('User already registered');
+      }
+      
       throw new Error(`Registration failed: ${error.message}`);
     }
 

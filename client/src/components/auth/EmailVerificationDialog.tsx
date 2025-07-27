@@ -31,8 +31,10 @@ export function EmailVerificationDialog({
     try {
       setIsResending(true);
       
-      const response = await apiRequest('POST', '/api/auth/resend-verification', {
-        email: email,
+      const response = await apiRequest('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email }),
       });
 
       if (response.ok) {
