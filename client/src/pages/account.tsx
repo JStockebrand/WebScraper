@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
@@ -12,7 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Home, Search, Calendar, Globe } from 'lucide-react';
+import { DeleteAccountDialog } from '@/components/auth/DeleteAccountDialog';
+import { Home, Search, Calendar, Globe, Trash2 } from 'lucide-react';
 
 interface SearchHistory {
   id: string;
@@ -27,6 +29,7 @@ interface SearchHistory {
 export function AccountPage() {
   const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { data: searchHistory = [], isLoading } = useQuery<SearchHistory[]>({
     queryKey: ['/api/searches/history'],
@@ -228,7 +231,42 @@ export function AccountPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Account Settings */}
+        <Card className="border-red-200 dark:border-red-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <Trash2 className="h-5 w-5" />
+              Danger Zone
+            </CardTitle>
+            <CardDescription>
+              Irreversible actions that will permanently affect your account
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-800">
+              <div>
+                <h4 className="font-medium text-red-800 dark:text-red-200">Delete Account</h4>
+                <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                  Permanently delete your account and all associated data. This cannot be undone.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteDialog(true)}
+                className="ml-4 flex-shrink-0"
+              >
+                Delete Account
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      <DeleteAccountDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+      />
     </div>
   );
 }

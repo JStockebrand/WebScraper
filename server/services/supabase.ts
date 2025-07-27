@@ -207,6 +207,20 @@ export class AuthService {
     console.log('Verification email resent successfully');
   }
 
+  // Delete user account
+  async deleteUser(userId: string) {
+    console.log(`Deleting user from Supabase Auth: ${userId}`);
+    
+    const { error } = await supabase.auth.admin.deleteUser(userId);
+
+    if (error) {
+      console.error('Supabase user deletion error:', error);
+      throw new Error(`User deletion failed: ${error.message}`);
+    }
+    
+    console.log('User deleted from Supabase Auth successfully');
+  }
+
   // Update password
   async updatePassword(newPassword: string) {
     const { error } = await supabase.auth.updateUser({

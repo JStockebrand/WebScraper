@@ -10,6 +10,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   updateUser(id: string, updates: Partial<User>): Promise<void>;
   updateUserSearchUsage(id: string, increment: number): Promise<void>;
+  deleteUser(id: string): Promise<void>;
   updateUserStripeInfo(id: string, customerId: string, subscriptionId: string): Promise<void>;
   
   // Search operations
@@ -76,6 +77,39 @@ export class MemStorage implements IStorage {
       const updatedUser = { 
         ...user, 
         searchesUsed: (user.searchesUsed || 0) + increment,
+        updatedAt: new Date()
+      };
+      this.users.set(id, updatedUser);
+    }
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    // Delete user's searches and search results
+    const userSearches = Array.from(this.searches.values())
+      .filter(search => search.userId === id);
+    
+    userSearches.forEach(search => {
+      // Delete search results for this search
+      Array.from(this.searchResults.values())
+        .filter(result => result.searchId === search.id)
+        .forEach(result => this.searchResults.delete(result.id));
+      
+      // Delete the search
+      this.searches.delete(search.id);
+    });
+
+    // Delete the user
+    this.users.delete(id);
+    console.log(`Deleted user ${id} and all associated data from memory storage`);
+  }
+
+  async updateUserStripeInfo(id: string, customerId: string, subscriptionId: string): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      const updatedUser = { 
+        ...user, 
+        stripeCustomerId: customerId,
+        stripeSubscriptionId: subscriptionId,
         updatedAt: new Date()
       };
       this.users.set(id, updatedUser);
@@ -325,7 +359,23 @@ export class PgStorage implements IStorage {
       .where(eq(users.id, id));
   }
 
-
+  async deleteUser(id: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    // Delete user's search results first (foreign key constraint)
+    await this.db.delete(searchResults)
+      .where(eq(searchResults.userId, id));
+    
+    // Delete user's searches
+    await this.db.delete(searches)
+      .where(eq(searches.userId, id));
+    
+    // Delete the user
+    await this.db.delete(users)
+      .where(eq(users.id, id));
+    
+    console.log(`Deleted user ${id} and all associated data from database`);
+  }
 }
 
 // Use PostgreSQL storage when SUPABASE_CONNECTION_STRING or DATABASE_URL is available, otherwise fallback to memory

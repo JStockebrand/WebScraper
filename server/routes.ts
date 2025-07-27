@@ -385,6 +385,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete user account
+  app.delete("/api/auth/account", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    try {
+      const userId = req.user.id;
+      const userEmail = req.user.email;
+      
+      console.log(`Deleting account for user: ${userEmail} (${userId})`);
+
+      // Delete from Supabase Auth
+      const { authService } = await import('./services/supabase');
+      await authService.deleteUser(userId);
+
+      // Delete user data from our database
+      await storage.deleteUser(userId);
+      
+      // Clear session
+      req.logout((err) => {
+        if (err) {
+          console.error('Logout error during account deletion:', err);
+        }
+      });
+
+      console.log(`Account successfully deleted: ${userEmail}`);
+      res.json({ 
+        success: true,
+        message: 'Account deleted successfully' 
+      });
+    } catch (error: any) {
+      console.error('Account deletion error:', error);
+      res.status(500).json({ 
+        error: 'Failed to delete account. Please try again later.' 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
