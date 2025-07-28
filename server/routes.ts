@@ -385,6 +385,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin endpoint to delete user by email
+  app.post("/api/admin/delete-user", async (req, res) => {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    try {
+      console.log(`Admin deleting account for email: ${email}`);
+
+      // Delete from Supabase Auth
+      const { authService } = await import('./services/supabase');
+      
+      // First find the user by email
+      const { data: { users }, error: listError } = await authService.supabase.auth.admin.listUsers();
+      
+      if (listError) {
+        throw new Error(`Failed to list users: ${listError.message}`);
+      }
+      
+      const user = users.find(u => u.email === email);
+      
+      if (!user) {
+        return res.json({ 
+          success: true,
+          message: `No account found for ${email} - already deleted or never existed` 
+        });
+      }
+
+      await authService.deleteUser(user.id);
+
+      // Delete user data from our database
+      await storage.deleteUser(user.id);
+      
+      console.log(`Admin successfully deleted account: ${email}`);
+      res.json({ 
+        success: true,
+        message: `Account for ${email} deleted successfully`,
+        userId: user.id
+      });
+    } catch (error: any) {
+      console.error('Admin account deletion error:', error);
+      res.status(500).json({ 
+        error: `Failed to delete account for ${email}: ${error.message}` 
+      });
+    }
+  });
+
   // Delete user account
   app.delete("/api/auth/account", async (req, res) => {
     if (!req.isAuthenticated()) {
