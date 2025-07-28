@@ -90,6 +90,15 @@ This is a full-stack web application that allows users to search the web, scrape
 - **Workflows**: Automated startup with port waiting
 
 ## Recent Changes
+- July 28, 2025: ACCOUNT DELETION SYSTEM - Complete Implementation:
+  - Successfully implemented delete account functionality in user settings
+  - Added confirmation dialog requiring "DELETE" confirmation text
+  - Created admin endpoint for email-based account deletion 
+  - Enhanced Supabase service with admin client for user management
+  - Added proper cleanup of user data from both Supabase Auth and application database
+  - Deleted specific test accounts: jwstock3921@gmail.com and jwstockebrand@gmail.com
+  - Account deletion is now available to signed-in users in the "Danger Zone" section
+  - Complete data removal includes searches, results, subscription info, and user profile
 - July 23, 2025: EMAIL VERIFICATION SYSTEM - Complete Implementation:
   - Implemented email verification flow immediately after user registration
   - Created EmailVerificationDialog component for user guidance through verification process
