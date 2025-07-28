@@ -208,6 +208,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Verify session endpoint for email verification redirect
+  app.post('/api/auth/verify-session', async (req, res) => {
+    try {
+      const { accessToken, refreshToken } = req.body;
+      
+      if (!accessToken) {
+        return res.status(400).json({ error: 'Access token required' });
+      }
+
+      // Verify the session with Supabase
+      const user = await authService.verifySession(accessToken);
+      
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid session' });
+      }
+
+      // Get or create user profile in our database
+      let userProfile = await storage.getUser(user.id);
+      if (!userProfile) {
+        userProfile = await storage.createUser({
+          id: user.id,
+          email: user.email!,
+          displayName: user.user_metadata?.display_name || user.email!.split('@')[0],
+          subscriptionTier: 'free',
+        });
+      }
+
+      // Return user data for frontend
+      res.json({
+        id: userProfile.id,
+        email: userProfile.email,
+        displayName: userProfile.displayName,
+        subscriptionTier: userProfile.subscriptionTier,
+        searchesUsed: userProfile.searchesUsed,
+        searchesLimit: userProfile.searchesLimit,
+      });
+      
+    } catch (error: any) {
+      console.error('Session verification error:', error);
+      res.status(500).json({ error: 'Failed to verify session' });
+    }
+  });
+
   // Health check endpoint (no auth required)
   app.get("/api/health", (req, res) => {
     res.json({ 

@@ -43,7 +43,7 @@ export class AuthService {
         data: {
           display_name: displayName || email.split('@')[0],
         },
-        emailRedirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth?verified=true`
+        emailRedirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth`
       }
     });
 
@@ -169,7 +169,7 @@ export class AuthService {
       type: 'signup',
       email: email,
       options: {
-        emailRedirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth?verified=true`
+        emailRedirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth`
       }
     });
 
@@ -185,7 +185,7 @@ export class AuthService {
   // Send password reset email
   async sendPasswordReset(email: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth?verified=true`
+      redirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth`
     });
 
     if (error) {
