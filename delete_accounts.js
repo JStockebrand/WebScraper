@@ -1,9 +1,5 @@
 // Use ES module import syntax
 import { createClient } from '@supabase/supabase-js';
-import { config } from 'dotenv';
-
-// Load environment variables
-config();
 
 // Note: In production, these would come from Replit secrets
 // For Supabase, we need the service role key (not anon key) for admin operations

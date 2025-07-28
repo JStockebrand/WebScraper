@@ -397,10 +397,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Admin deleting account for email: ${email}`);
 
       // Delete from Supabase Auth
-      const { authService } = await import('./services/supabase');
+      const { authService, supabaseAdmin } = await import('./services/supabase');
       
-      // First find the user by email
-      const { data: { users }, error: listError } = await authService.supabase.auth.admin.listUsers();
+      // First find the user by email using admin client
+      if (!supabaseAdmin) {
+        throw new Error('Admin operations require SUPABASE_SERVICE_ROLE_KEY');
+      }
+      
+      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
       
       if (listError) {
         throw new Error(`Failed to list users: ${listError.message}`);

@@ -4,6 +4,7 @@ import { storage } from '../storage';
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please set SUPABASE_URL and SUPABASE_ANON_KEY.');
@@ -12,8 +13,26 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Supabase client is configured and ready
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Admin client for user management operations
+export const supabaseAdmin = (() => {
+  if (!supabaseServiceKey) {
+    console.warn('SUPABASE_SERVICE_ROLE_KEY not found - admin operations will not be available');
+    return null;    
+  }
+  
+  console.log('Initializing Supabase admin client with service role key');
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
+})();
+
 // Authentication service
 export class AuthService {
+  public supabase = supabase;
+  public supabaseAdmin = supabaseAdmin;
   
   // Register new user
   async register(email: string, password: string, displayName?: string) {
@@ -211,7 +230,11 @@ export class AuthService {
   async deleteUser(userId: string) {
     console.log(`Deleting user from Supabase Auth: ${userId}`);
     
-    const { error } = await supabase.auth.admin.deleteUser(userId);
+    if (!this.supabaseAdmin) {
+      throw new Error('Admin operations require SUPABASE_SERVICE_ROLE_KEY');
+    }
+    
+    const { error } = await this.supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (error) {
       console.error('Supabase user deletion error:', error);
