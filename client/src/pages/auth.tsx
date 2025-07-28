@@ -5,6 +5,7 @@ import { RegisterForm } from '@/components/auth/RegisterForm';
 import { EmailVerificationDialog } from '@/components/auth/EmailVerificationDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { parseAuthParams, cleanAuthParams } from '@/lib/redirectUrls';
 
 export function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -14,31 +15,61 @@ export function AuthPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  // Check for email verification success and handle automatic sign-in
+  // Handle authentication redirects according to Supabase documentation
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const accessToken = urlParams.get('access_token');
-    const refreshToken = urlParams.get('refresh_token');
+    const params = parseAuthParams();
     
-    if (accessToken && refreshToken) {
-      // User clicked verification link - automatically sign them in
-      handleEmailVerificationSignIn(accessToken, refreshToken);
-    } else if (urlParams.get('verified') === 'true') {
+    // Handle authentication errors first
+    if (params.error) {
+      handleAuthError(params);
+      cleanAuthParams();
+      return;
+    }
+    
+    // Handle different authentication types
+    if (params.accessToken && params.refreshToken) {
+      if (params.type === 'signup') {
+        // Email verification
+        handleEmailVerificationSignIn(params.accessToken, params.refreshToken);
+      } else if (params.type === 'recovery') {
+        // Password reset
+        handlePasswordResetSignIn(params.accessToken, params.refreshToken);
+      } else {
+        // Generic authentication
+        handleEmailVerificationSignIn(params.accessToken, params.refreshToken);
+      }
+    } else if (params.type === 'signup' && !params.error) {
       toast({
         title: "Email Verified!",
         description: "Your email has been verified. You can now sign in to your account.",
       });
-      // Clear the URL parameter
-      window.history.replaceState({}, document.title, window.location.pathname);
+      cleanAuthParams();
     }
   }, [toast]);
 
+  const handleAuthError = (params: any) => {
+    console.error('Authentication error:', params);
+    
+    let errorMessage = 'Authentication failed';
+    
+    // Handle specific error codes according to Supabase docs
+    if (params.errorCode?.startsWith('4')) {
+      errorMessage = params.errorDescription || 'Authentication error occurred';
+    } else if (params.error === 'access_denied') {
+      errorMessage = 'Access was denied. Please try again.';
+    } else if (params.error === 'server_error') {
+      errorMessage = 'Server error occurred. Please try again later.';
+    }
+    
+    toast({
+      title: "Authentication Error",
+      description: errorMessage,
+      variant: "destructive",
+    });
+  };
+
   const handleEmailVerificationSignIn = async (accessToken: string, refreshToken: string) => {
     try {
-      // Store tokens and sign in the user automatically
-      localStorage.setItem('supabase_token', accessToken);
-      localStorage.setItem('supabase_refresh_token', refreshToken);
-      
       // Call our auth service to set up the session
       const response = await fetch('/api/auth/verify-session', {
         method: 'POST',
@@ -63,8 +94,7 @@ export function AuthPage() {
         throw new Error('Failed to verify session');
       }
       
-      // Clean up URL parameters
-      window.history.replaceState({}, document.title, window.location.pathname);
+      cleanAuthParams();
       
     } catch (error) {
       console.error('Auto sign-in failed:', error);
@@ -73,8 +103,44 @@ export function AuthPage() {
         description: "Your email is verified. Please sign in with your credentials.",
         variant: "default",
       });
-      // Clean up URL and show login form
-      window.history.replaceState({}, document.title, window.location.pathname);
+      cleanAuthParams();
+    }
+  };
+
+  const handlePasswordResetSignIn = async (accessToken: string, refreshToken: string) => {
+    try {
+      // For password reset, we need to handle the session and redirect to password change
+      const response = await fetch('/api/auth/verify-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ accessToken, refreshToken }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Reset Link Verified",
+          description: "Please enter your new password.",
+        });
+        
+        // Show password reset form or redirect to reset page
+        setLocation('/reset-password');
+      } else {
+        throw new Error('Failed to verify reset session');
+      }
+      
+      cleanAuthParams();
+      
+    } catch (error) {
+      console.error('Password reset verification failed:', error);
+      toast({
+        title: "Reset Link Expired",
+        description: "Please request a new password reset link.",
+        variant: "destructive",
+      });
+      cleanAuthParams();
     }
   };
 

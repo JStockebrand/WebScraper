@@ -1,6 +1,29 @@
 import { createClient } from '@supabase/supabase-js';
 import { storage } from '../storage';
 
+// Dynamic URL generation for different environments
+const getBaseURL = (): string => {
+  // In production
+  if (process.env.NODE_ENV === 'production') {
+    return process.env.SITE_URL || process.env.VITE_SITE_URL || 'https://your-app.replit.app';
+  }
+  
+  // In development
+  return 'http://localhost:5000';
+};
+
+const getAuthRedirectURL = (): string => {
+  return `${getBaseURL()}/auth`;
+};
+
+const getPasswordResetURL = (): string => {
+  return `${getBaseURL()}/auth?type=recovery`;
+};
+
+const getEmailConfirmURL = (): string => {
+  return `${getBaseURL()}/auth?type=signup`;
+};
+
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -43,7 +66,7 @@ export class AuthService {
         data: {
           display_name: displayName || email.split('@')[0],
         },
-        emailRedirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth`
+        emailRedirectTo: getEmailConfirmURL()
       }
     });
 
@@ -169,7 +192,7 @@ export class AuthService {
       type: 'signup',
       email: email,
       options: {
-        emailRedirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth`
+        emailRedirectTo: getEmailConfirmURL()
       }
     });
 
@@ -185,7 +208,7 @@ export class AuthService {
   // Send password reset email
   async sendPasswordReset(email: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth`
+      redirectTo: getPasswordResetURL()
     });
 
     if (error) {
