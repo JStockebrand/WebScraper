@@ -64,11 +64,11 @@ export class AuthService {
       throw new Error('Registration failed: No user data returned');
     }
 
-    // For demo purposes, simulate email verification requirement
-    // In production, Supabase would be configured to require verification
-    console.log('Registration successful, simulating email verification requirement for:', data.user.email);
+    console.log('Registration successful for:', data.user.email);
+    console.log('Email confirmed at registration:', data.user.email_confirmed_at);
+    console.log('Session created:', !!data.session);
     
-    // Create user profile in our database first
+    // Create user profile in our database if this is a new user
     try {
       const existingUser = await storage.getUser(data.user.id);
       if (!existingUser) {
@@ -87,12 +87,25 @@ export class AuthService {
       // Don't throw here as auth user was created successfully
     }
 
-    // Return user data but no session to demonstrate verification flow
-    return { 
-      user: data.user, 
-      session: null,
-      needsVerification: true 
-    };
+    // Check if email verification is required
+    const needsVerification = !data.user.email_confirmed_at && !data.session;
+    
+    if (needsVerification) {
+      console.log('🔒 Email verification required - no session created');
+      console.log('📧 Verification email should have been sent by Supabase');
+      return { 
+        user: data.user, 
+        session: null,
+        emailVerificationRequired: true 
+      };
+    } else {
+      console.log('✅ User registered and can proceed (verification disabled or already confirmed)');
+      return { 
+        user: data.user, 
+        session: data.session,
+        emailVerificationRequired: false 
+      };
+    }
   }
 
   // Sign in user
@@ -148,6 +161,40 @@ export class AuthService {
     }
 
     return user;
+  }
+
+  // Resend verification email
+  async resendVerificationEmail(email: string) {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+      options: {
+        emailRedirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth?verified=true`
+      }
+    });
+
+    if (error) {
+      console.error('Resend verification error:', error);
+      throw new Error(`Failed to resend verification email: ${error.message}`);
+    }
+
+    console.log(`Verification email resent to: ${email}`);
+    return { success: true };
+  }
+
+  // Send password reset email
+  async sendPasswordReset(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth?verified=true`
+    });
+
+    if (error) {
+      console.error('Password reset error:', error);
+      throw new Error(`Failed to send password reset email: ${error.message}`);
+    }
+
+    console.log(`Password reset email sent to: ${email}`);
+    return { success: true };
   }
 
   // Verify user session

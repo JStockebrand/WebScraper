@@ -185,6 +185,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Resend verification email
+  app.post('/api/auth/resend-verification', async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: 'Email is required' });
+      }
+
+      const result = await authService.resendVerificationEmail(email);
+      res.json({ 
+        message: 'Verification email sent successfully',
+        ...result 
+      });
+    } catch (error: any) {
+      console.error('Resend verification error:', error);
+      res.status(500).json({ 
+        message: 'Failed to send verification email',
+        error: error.message 
+      });
+    }
+  });
+
   // Health check endpoint (no auth required)
   app.get("/api/health", (req, res) => {
     res.json({ 
