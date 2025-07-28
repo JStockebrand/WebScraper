@@ -12,8 +12,7 @@ const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
 });
 
 const emailsToDelete = [
-  'jwstock3921@gmail.com',
-  'jwstockebrand@gmail.com'
+  'jwstock3921@gmail.com'
 ];
 
 async function deleteUserByEmail(email) {
