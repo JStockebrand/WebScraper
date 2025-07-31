@@ -127,7 +127,12 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-3">
             {user ? (
-              <UserMenu />
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-700 font-medium">
+                  {user.displayName || user.email.split('@')[0]}
+                </span>
+                <UserMenu />
+              </div>
             ) : (
               <Link href="/auth">
                 <Button variant="outline" className="flex items-center gap-2">

@@ -185,6 +185,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user saved searches (requires authentication)
+  app.get("/api/searches/saved", authenticateUser, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const savedSearches = await storage.getUserSavedSearches(user.id);
+      res.json(savedSearches);
+    } catch (error) {
+      console.error("Get saved searches error:", error);
+      res.status(500).json({ error: "Failed to get saved searches" });
+    }
+  });
+
   // Resend verification email
   app.post('/api/auth/resend-verification', async (req, res) => {
     try {

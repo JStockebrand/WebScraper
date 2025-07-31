@@ -25,6 +25,7 @@ export const searches = pgTable("searches", {
   status: text("status").notNull(), // 'searching', 'completed', 'error'
   totalResults: integer("total_results").default(0),
   searchTime: integer("search_time"), // in milliseconds
+  isSaved: boolean("is_saved").default(false), // User can save/like searches
   createdAt: timestamp("created_at").defaultNow(),
 });
 

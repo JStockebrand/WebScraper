@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { DeleteAccountDialog } from '@/components/auth/DeleteAccountDialog';
-import { Home, Search, Calendar, Globe, Trash2 } from 'lucide-react';
+import { Home, Search, Calendar, Globe, Trash2, Heart, Star } from 'lucide-react';
 
 interface SearchHistory {
   id: string;
@@ -24,6 +24,7 @@ interface SearchHistory {
   summaryText: string | null;
   totalResults: number;
   confidence: number | null;
+  isSaved: boolean;
 }
 
 export function AccountPage() {
@@ -35,6 +36,15 @@ export function AccountPage() {
     queryKey: ['/api/searches/history'],
     enabled: !!user,
   });
+
+  const { data: savedSearches = [], isLoading: isLoadingSaved } = useQuery<SearchHistory[]>({
+    queryKey: ['/api/searches/saved'],
+    enabled: !!user,
+  });
+
+  // Get last 5 searches and last 5 saved searches
+  const recentSearches = searchHistory.slice(0, 5);
+  const recentSaved = savedSearches.slice(0, 5);
 
   if (loading) {
     return (
@@ -153,84 +163,121 @@ export function AccountPage() {
           </Card>
         </div>
 
-        {/* Search History */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Search History
-            </CardTitle>
-            <CardDescription>
-              Your recent searches and summaries
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              </div>
-            ) : searchHistory.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No searches yet</p>
-                <p className="text-sm">Start searching to see your history here</p>
-                <Button
-                  onClick={() => setLocation('/')}
-                  className="mt-4"
-                  variant="outline"
-                >
-                  Start Searching
-                </Button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Query</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Results</TableHead>
-                      <TableHead>Summary</TableHead>
-                      <TableHead>Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {searchHistory.map((search: SearchHistory) => (
-                      <TableRow key={search.id}>
-                        <TableCell className="font-medium max-w-xs">
-                          <div className="truncate" title={search.query}>
-                            {search.query}
-                          </div>
-                        </TableCell>
-                        <TableCell>
+        {/* Recent Search History and Saved Searches */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Recent Searches */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Recent Searches
+              </CardTitle>
+              <CardDescription>
+                Your last 5 searches
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : recentSearches.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No searches yet</p>
+                  <p className="text-sm">Start searching to see your history here</p>
+                  <Button
+                    onClick={() => setLocation('/')}
+                    className="mt-4"
+                    variant="outline"
+                  >
+                    Start Searching
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {recentSearches.map((search: SearchHistory) => (
+                    <div key={search.id} className="border rounded-lg p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-medium text-sm truncate flex-1 pr-2">
+                          {search.query}
+                        </h4>
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           {getStatusBadge(search.status)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span>{search.totalResults}</span>
-                            {search.confidence && (
-                              <Badge variant="outline" className="text-xs">
-                                {Math.round(search.confidence * 100)}%
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="max-w-md">
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
-                            {truncateText(search.summaryText)}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-gray-500">
-                          {formatDate(search.createdAt)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500 mb-2">
+                        {formatDate(search.createdAt)} • {search.totalResults} results
+                        {search.confidence && (
+                          <span> • {Math.round(search.confidence * 100)}% confidence</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        {truncateText(search.summaryText, 80)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Saved/Liked Searches */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Heart className="h-5 w-5" />
+                Saved Searches
+              </CardTitle>
+              <CardDescription>
+                Your favorite searches (coming soon)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingSaved ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : recentSaved.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <Star className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No saved searches yet</p>
+                  <p className="text-sm">Save searches to access them quickly later</p>
+                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                    <p className="text-xs text-blue-600 dark:text-blue-400">
+                      💡 Save/like functionality coming soon! You'll be able to save your favorite search results.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {recentSaved.map((search: SearchHistory) => (
+                    <div key={search.id} className="border rounded-lg p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-medium text-sm truncate flex-1 pr-2">
+                          {search.query}
+                        </h4>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {getStatusBadge(search.status)}
+                          <Heart className="h-4 w-4 text-red-500 fill-current" />
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500 mb-2">
+                        {formatDate(search.createdAt)} • {search.totalResults} results
+                        {search.confidence && (
+                          <span> • {Math.round(search.confidence * 100)}% confidence</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        {truncateText(search.summaryText, 80)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Account Settings */}
         <Card className="border-red-200 dark:border-red-800">

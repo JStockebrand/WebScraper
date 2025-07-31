@@ -19,6 +19,7 @@ export interface IStorage {
   getSearch(id: number): Promise<Search | undefined>;
   getUserSearches(userId: string, limit?: number): Promise<Search[]>;
   getUserSearchHistory(userId: string, limit?: number): Promise<any[]>;
+  getUserSavedSearches(userId: string, limit?: number): Promise<any[]>;
   createSearchResult(result: InsertSearchResult): Promise<SearchResult>;
   getSearchResults(searchId: number): Promise<SearchResult[]>;
 }
@@ -132,6 +133,7 @@ export class MemStorage implements IStorage {
       status: 'searching',
       totalResults: 0,
       searchTime: null,
+      isSaved: false,
       createdAt: new Date(),
     };
     this.searches.set(id, search);
@@ -195,8 +197,34 @@ export class MemStorage implements IStorage {
         summaryText: firstResult?.summary || null,
         totalResults: search.totalResults,
         confidence: firstResult?.confidence || null,
+        isSaved: search.isSaved,
       };
     });
+  }
+
+  async getUserSavedSearches(userId: string, limit?: number): Promise<any[]> {
+    const userSavedSearches = Array.from(this.searches.values())
+      .filter(search => search.userId === userId && search.isSaved)
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+    
+    // Get first result's summary for each search
+    const searchesWithSummaries = userSavedSearches.map(search => {
+      const firstResult = Array.from(this.searchResults.values())
+        .find(result => result.searchId === search.id);
+      
+      return {
+        id: search.id,
+        query: search.query,
+        status: search.status,
+        createdAt: search.createdAt?.toISOString() || new Date().toISOString(),
+        summaryText: firstResult?.summary || null,
+        totalResults: search.totalResults,
+        confidence: firstResult?.confidence || null,
+        isSaved: search.isSaved,
+      };
+    });
+    
+    return limit ? searchesWithSummaries.slice(0, limit) : searchesWithSummaries;
   }
 }
 
@@ -359,12 +387,55 @@ export class PgStorage implements IStorage {
       .where(eq(users.id, id));
   }
 
+  async getUserSavedSearches(userId: string, limit?: number): Promise<any[]> {
+    const query = this.db
+      .select({
+        id: searches.id,
+        query: searches.query,
+        status: searches.status,
+        createdAt: searches.createdAt,
+        totalResults: searches.totalResults,
+        summary: searchResults.summary,
+        confidence: searchResults.confidence,
+        isSaved: searches.isSaved,
+      })
+      .from(searches)
+      .leftJoin(searchResults, eq(searches.id, searchResults.searchId))
+      .where(eq(searches.userId, userId))
+      .orderBy(desc(searches.createdAt));
+
+    const results = limit ? await query.limit(limit) : await query;
+    
+    // Group by search ID and return with first result's summary, only saved searches
+    const groupedResults = results.reduce((acc, row) => {
+      if (!acc[row.id] && row.isSaved) {
+        acc[row.id] = {
+          id: row.id,
+          query: row.query,
+          status: row.status,
+          createdAt: row.createdAt?.toISOString() || new Date().toISOString(),
+          summaryText: row.summary || null,
+          totalResults: row.totalResults,
+          confidence: row.confidence || null,
+          isSaved: row.isSaved,
+        };
+      }
+      return acc;
+    }, {} as any);
+
+    return Object.values(groupedResults);
+  }
+
   async deleteUser(id: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
     
-    // Delete user's search results first (foreign key constraint)
-    await this.db.delete(searchResults)
-      .where(eq(searchResults.userId, id));
+    // Get user searches first
+    const userSearches = await this.db.select().from(searches).where(eq(searches.userId, id));
+    
+    // Delete search results for each search
+    for (const search of userSearches) {
+      await this.db.delete(searchResults).where(eq(searchResults.searchId, search.id));
+    }
     
     // Delete user's searches
     await this.db.delete(searches)

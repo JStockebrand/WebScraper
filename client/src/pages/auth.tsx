@@ -88,8 +88,8 @@ export function AuthPage() {
           description: "Your email has been verified and you're now signed in.",
         });
         
-        // Redirect to home page
-        setLocation('/');
+        // Redirect to account page for verified users
+        setLocation('/account');
       } else {
         throw new Error('Failed to verify session');
       }
@@ -177,8 +177,8 @@ export function AuthPage() {
         setVerificationEmail(email);
         setShowEmailVerification(true);
       } else {
-        // Registration complete - user can login
-        setLocation('/');
+        // Registration complete - go to account page
+        setLocation('/account');
       }
     } catch (error) {
       throw error; // Let the form handle the error
