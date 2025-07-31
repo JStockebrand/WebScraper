@@ -20,6 +20,7 @@ export interface IStorage {
   getUserSearches(userId: string, limit?: number): Promise<Search[]>;
   getUserSearchHistory(userId: string, limit?: number): Promise<any[]>;
   getUserSavedSearches(userId: string, limit?: number): Promise<any[]>;
+  toggleSearchSaved(searchId: number, isSaved: boolean): Promise<void>;
   createSearchResult(result: InsertSearchResult): Promise<SearchResult>;
   getSearchResults(searchId: number): Promise<SearchResult[]>;
 }
@@ -226,6 +227,14 @@ export class MemStorage implements IStorage {
     
     return limit ? searchesWithSummaries.slice(0, limit) : searchesWithSummaries;
   }
+
+  async toggleSearchSaved(searchId: number, isSaved: boolean): Promise<void> {
+    const search = this.searches.get(searchId);
+    if (search) {
+      const updatedSearch = { ...search, isSaved };
+      this.searches.set(searchId, updatedSearch);
+    }
+  }
 }
 
 // PostgreSQL Storage implementation
@@ -424,6 +433,12 @@ export class PgStorage implements IStorage {
     }, {} as any);
 
     return Object.values(groupedResults);
+  }
+
+  async toggleSearchSaved(searchId: number, isSaved: boolean): Promise<void> {
+    await this.db.update(searches)
+      .set({ isSaved })
+      .where(eq(searches.id, searchId));
   }
 
   async deleteUser(id: string): Promise<void> {

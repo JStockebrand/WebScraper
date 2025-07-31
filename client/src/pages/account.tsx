@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { DeleteAccountDialog } from '@/components/auth/DeleteAccountDialog';
-import { Home, Search, Calendar, Globe, Trash2, Heart, Star } from 'lucide-react';
+import { Home, Search, Calendar, Globe, Trash2, Heart, Star, Loader2 } from 'lucide-react';
 
 interface SearchHistory {
   id: string;
@@ -31,6 +31,8 @@ export function AccountPage() {
   const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [savingSearchIds, setSavingSearchIds] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
 
   const { data: searchHistory = [], isLoading } = useQuery<SearchHistory[]>({
     queryKey: ['/api/searches/history'],
@@ -86,6 +88,44 @@ export function AccountPage() {
   const truncateText = (text: string | null, maxLength: number = 100) => {
     if (!text) return 'No summary available';
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  };
+
+  const toggleSaveSearch = async (searchId: string, currentlySaved: boolean) => {
+    if (!user) return;
+    
+    setSavingSearchIds(prev => new Set(prev).add(searchId));
+    
+    try {
+      const token = localStorage.getItem('supabase_token');
+      if (!token) {
+        alert('Please log in again to save searches.');
+        return;
+      }
+
+      const response = await fetch(`/api/searches/${searchId}/toggle-save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        // Refetch both search history and saved searches to update the UI
+        queryClient.invalidateQueries({ queryKey: ['/api/searches/history'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/searches/saved'] });
+      } else {
+        alert('Failed to update search. Please try again.');
+      }
+    } catch (err) {
+      alert('An error occurred. Please try again.');
+    } finally {
+      setSavingSearchIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(searchId);
+        return newSet;
+      });
+    }
   };
 
   return (
@@ -204,6 +244,19 @@ export function AccountPage() {
                         </h4>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {getStatusBadge(search.status)}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleSaveSearch(search.id, search.isSaved)}
+                            disabled={savingSearchIds.has(search.id)}
+                            className={`p-1 h-7 w-7 ${search.isSaved ? "bg-red-500 hover:bg-red-600 text-white" : ""}`}
+                          >
+                            {savingSearchIds.has(search.id) ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Heart className={`w-3 h-3 ${search.isSaved ? "fill-current" : ""}`} />
+                            )}
+                          </Button>
                         </div>
                       </div>
                       <div className="text-xs text-gray-500 mb-2">
@@ -230,7 +283,7 @@ export function AccountPage() {
                 Saved Searches
               </CardTitle>
               <CardDescription>
-                Your favorite searches (coming soon)
+                Your favorite searches
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -242,12 +295,7 @@ export function AccountPage() {
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                   <Star className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No saved searches yet</p>
-                  <p className="text-sm">Save searches to access them quickly later</p>
-                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                    <p className="text-xs text-blue-600 dark:text-blue-400">
-                      💡 Save/like functionality coming soon! You'll be able to save your favorite search results.
-                    </p>
-                  </div>
+                  <p className="text-sm">Click the heart button on searches to save them here</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -259,7 +307,19 @@ export function AccountPage() {
                         </h4>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {getStatusBadge(search.status)}
-                          <Heart className="h-4 w-4 text-red-500 fill-current" />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleSaveSearch(search.id, search.isSaved)}
+                            disabled={savingSearchIds.has(search.id)}
+                            className="p-1 h-7 w-7 bg-red-500 hover:bg-red-600 text-white"
+                          >
+                            {savingSearchIds.has(search.id) ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Heart className="w-3 h-3 fill-current" />
+                            )}
+                          </Button>
                         </div>
                       </div>
                       <div className="text-xs text-gray-500 mb-2">

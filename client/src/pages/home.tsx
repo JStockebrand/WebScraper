@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, FileText, Loader2, ExternalLink, List, User, LogIn } from "lucide-react";
+import { Search, FileText, Loader2, ExternalLink, List, User, LogIn, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,10 +21,12 @@ interface SearchResult {
 
 interface SearchData {
   search: {
+    id: number;
     query: string;
     status: string;
     totalResults: number;
     originalResultsCount?: number;
+    isSaved?: boolean;
   };
   results: SearchResult[];
   searchedUrls?: Array<{
@@ -39,6 +41,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [searchData, setSearchData] = useState<SearchData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [savingSearch, setSavingSearch] = useState(false);
   const { user } = useAuth();
 
   const handleSearch = async () => {
@@ -113,6 +116,44 @@ export default function Home() {
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSearch();
+    }
+  };
+
+  const toggleSaveSearch = async () => {
+    if (!searchData || !user) return;
+    
+    setSavingSearch(true);
+    try {
+      const token = localStorage.getItem('supabase_token');
+      if (!token) {
+        setError('Please log in again to save searches.');
+        return;
+      }
+
+      const response = await fetch(`/api/searches/${searchData.search.id}/toggle-save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setSearchData(prev => prev ? {
+          ...prev,
+          search: {
+            ...prev.search,
+            isSaved: result.isSaved
+          }
+        } : null);
+      } else {
+        setError('Failed to save search. Please try again.');
+      }
+    } catch (err) {
+      setError('An error occurred while saving. Please try again.');
+    } finally {
+      setSavingSearch(false);
     }
   };
 
@@ -222,9 +263,27 @@ export default function Home() {
         {searchData && (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Research Summary: "{searchData.search.query}"
-              </h2>
+              <div className="flex items-center justify-center gap-4 mb-2">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Research Summary: "{searchData.search.query}"
+                </h2>
+                {user && (
+                  <Button
+                    variant={searchData.search.isSaved ? "default" : "outline"}
+                    size="sm"
+                    onClick={toggleSaveSearch}
+                    disabled={savingSearch}
+                    className={searchData.search.isSaved ? "bg-red-500 hover:bg-red-600" : ""}
+                  >
+                    {savingSearch ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Heart className={`w-4 h-4 ${searchData.search.isSaved ? "fill-current" : ""}`} />
+                    )}
+                    {searchData.search.isSaved ? "Saved" : "Save"}
+                  </Button>
+                )}
+              </div>
               <p className="text-gray-600">
                 Consolidated analysis from {searchData.results.length} sources - One comprehensive summary combining all findings
               </p>

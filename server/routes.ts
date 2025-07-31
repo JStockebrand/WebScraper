@@ -197,6 +197,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Toggle save status for a search (requires authentication)
+  app.post("/api/searches/:id/toggle-save", authenticateUser, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const searchId = parseInt(req.params.id);
+      
+      if (isNaN(searchId)) {
+        return res.status(400).json({ error: "Invalid search ID" });
+      }
+
+      // Get the search to verify ownership
+      const search = await storage.getSearch(searchId);
+      if (!search) {
+        return res.status(404).json({ error: "Search not found" });
+      }
+
+      if (search.userId !== user.id) {
+        return res.status(403).json({ error: "Not authorized to modify this search" });
+      }
+
+      // Toggle the save status
+      await storage.toggleSearchSaved(searchId, !search.isSaved);
+      
+      res.json({ 
+        success: true, 
+        isSaved: !search.isSaved,
+        message: !search.isSaved ? "Search saved" : "Search removed from saved"
+      });
+    } catch (error) {
+      console.error("Toggle save search error:", error);
+      res.status(500).json({ error: "Failed to toggle search save status" });
+    }
+  });
+
   // Resend verification email
   app.post('/api/auth/resend-verification', async (req, res) => {
     try {
