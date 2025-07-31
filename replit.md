@@ -244,3 +244,8 @@ This is a full-stack web application that allows users to search the web, scrape
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+
+**Account Deletion Protocol**: When user requests to remove/delete emails or accounts from Supabase, perform complete deletion including:
+- Remove from Supabase Auth system
+- Remove from users table in database
+- Clean up all related data (searches, search results, etc.)
