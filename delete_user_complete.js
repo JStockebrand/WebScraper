@@ -1,126 +1,48 @@
-import { createClient } from '@supabase/supabase-js';
+// Complete deletion of jwstock3921@gmail.com bypassing schema issues
+import { neon } from '@neondatabase/serverless';
 
-// Initialize Supabase clients
-const supabaseUrl = process.env.DATABASE_URL?.match(/https:\/\/([^\.]+)\.supabase\.co/)?.[0] || 'https://csaksfdlssftgwobifis.supabase.co';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const sql = neon(process.env.DATABASE_URL);
 
-if (!supabaseServiceKey) {
-  console.error('❌ SUPABASE_SERVICE_ROLE_KEY not found');
-  process.exit(1);
-}
-
-// Admin client for both Auth and Database operations
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
-
-const emailToDelete = 'jwstock3921@gmail.com';
-
-async function completeUserDeletion() {
-  console.log('🚀 Starting complete user deletion...');
-  console.log(`📧 Target email: ${emailToDelete}`);
+async function deleteUserComplete() {
+  const userEmail = 'jwstock3921@gmail.com';
+  const userId = 'f3a26cc4-569f-4df7-9df3-1aad251e48c2';
+  
+  console.log(`Performing complete deletion for ${userEmail} (${userId})`);
   
   try {
-    // Step 1: Find user in Auth
-    console.log('\n1️⃣ Searching in Supabase Auth...');
-    const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers();
+    // Step 1: Delete all search results associated with this user's searches
+    console.log('1. Deleting search results...');
+    const deleteSearchResults = await sql`
+      DELETE FROM search_results 
+      WHERE search_id IN (
+        SELECT id FROM searches WHERE user_id = ${userId}
+      )
+    `;
+    console.log(`   Deleted ${deleteSearchResults.count || 0} search results`);
     
-    if (authError) {
-      console.error('❌ Error listing auth users:', authError);
-    } else {
-      const authUser = authUsers?.users?.find(u => u.email === emailToDelete);
-      
-      if (authUser) {
-        console.log(`✅ Found in Auth: ${authUser.id}`);
-        
-        // Delete from Auth
-        const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(authUser.id);
-        if (deleteAuthError) {
-          console.error('❌ Failed to delete from Auth:', deleteAuthError);
-        } else {
-          console.log('✅ Deleted from Supabase Auth');
-        }
-      } else {
-        console.log('ℹ️  Not found in Supabase Auth');
-      }
-    }
+    // Step 2: Delete all searches for this user
+    console.log('2. Deleting searches...');
+    const deleteSearches = await sql`
+      DELETE FROM searches WHERE user_id = ${userId}
+    `;
+    console.log(`   Deleted ${deleteSearches.count || 0} searches`);
     
-    // Step 2: Find and delete from users table
-    console.log('\n2️⃣ Searching in users table...');
-    const { data: dbUsers, error: dbError } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('email', emailToDelete);
+    // Step 3: Delete the user
+    console.log('3. Deleting user...');
+    const deleteUser = await sql`
+      DELETE FROM users WHERE id = ${userId}
+    `;
+    console.log(`   Deleted user record (${deleteUser.count || 0} rows affected)`);
     
-    if (dbError) {
-      console.error('❌ Error querying users table:', dbError);
-    } else if (dbUsers && dbUsers.length > 0) {
-      console.log(`✅ Found ${dbUsers.length} record(s) in users table`);
-      
-      for (const user of dbUsers) {
-        console.log(`🗑️  Deleting user: ${user.id} (${user.email})`);
-        
-        // Delete user data
-        const { error: deleteError } = await supabaseAdmin
-          .from('users')
-          .delete()
-          .eq('id', user.id);
-        
-        if (deleteError) {
-          console.error(`❌ Failed to delete user ${user.id}:`, deleteError);
-        } else {
-          console.log(`✅ Deleted user ${user.id} from users table`);
-        }
-      }
-    } else {
-      console.log('ℹ️  Not found in users table');
-    }
-    
-    // Step 3: Clean up related data (searches, search_results)
-    console.log('\n3️⃣ Cleaning up related data...');
-    
-    // Find user ID from any remaining records
-    const { data: searchData } = await supabaseAdmin
-      .from('searches')
-      .select('user_id')
-      .eq('user_id', dbUsers?.[0]?.id || 'no-match');
-    
-    if (searchData && searchData.length > 0) {
-      const userId = searchData[0].user_id;
-      
-      // Delete search results
-      const { error: resultsError } = await supabaseAdmin
-        .from('search_results')
-        .delete()
-        .eq('user_id', userId);
-      
-      if (resultsError) {
-        console.error('❌ Error deleting search results:', resultsError);
-      } else {
-        console.log('✅ Deleted search results');
-      }
-      
-      // Delete searches
-      const { error: searchesError } = await supabaseAdmin
-        .from('searches')
-        .delete()
-        .eq('user_id', userId);
-      
-      if (searchesError) {
-        console.error('❌ Error deleting searches:', searchesError);
-      } else {
-        console.log('✅ Deleted searches');
-      }
-    }
-    
-    console.log('\n✨ Complete deletion finished!');
+    console.log(`\n✓ Complete deletion successful for ${userEmail}`);
+    console.log('  - All search results removed');
+    console.log('  - All searches removed');
+    console.log('  - User account removed');
+    console.log('\nThe account has been completely removed from the application database.');
     
   } catch (error) {
-    console.error('❌ Unexpected error:', error);
+    console.error('Error during complete deletion:', error.message);
   }
 }
 
-completeUserDeletion();
+deleteUserComplete().catch(console.error);

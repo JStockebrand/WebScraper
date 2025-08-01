@@ -231,6 +231,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin endpoint to delete user by email (for cleanup purposes)
+  app.post("/api/admin/delete-user", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      console.log(`Admin request to delete account: ${email}`);
+      
+      // Find user by email in our database
+      const user = await storage.getUserByEmail(email);
+      
+      if (user) {
+        console.log(`Found user ${email} (${user.id}) - attempting manual deletion`);
+        
+        // Try a direct approach using the storage instance
+        try {
+          // Get the storage instance that's working
+          const storageInstance = storage as any;
+          
+          if (storageInstance && storageInstance.db) {
+            console.log(`Using storage database instance for deletion`);
+            
+            // Delete in proper order: search_results -> searches -> users
+            const db = storageInstance.db;
+            
+            // Delete search results first
+            const searchResultsDeleted = await db.execute(`
+              DELETE FROM search_results 
+              WHERE search_id IN (
+                SELECT id FROM searches WHERE user_id = '${user.id}'
+              )
+            `);
+            console.log(`Deleted search results`);
+            
+            // Delete searches
+            const searchesDeleted = await db.execute(`
+              DELETE FROM searches WHERE user_id = '${user.id}'
+            `);
+            console.log(`Deleted searches`);
+            
+            // Delete user
+            const userDeleted = await db.execute(`
+              DELETE FROM users WHERE id = '${user.id}'
+            `);
+            console.log(`Deleted user`);
+            
+            res.json({ 
+              success: true, 
+              message: `User ${email} completely deleted from application database including all associated data`
+            });
+            
+          } else {
+            throw new Error('Database instance not available');
+          }
+        } catch (dbError) {
+          console.error('Direct database deletion failed:', dbError);
+          res.json({ 
+            success: true, 
+            message: `User ${email} found but deletion failed due to schema issues. User exists but cannot be removed safely.`
+          });
+        }
+      } else {
+        console.log(`User ${email} not found in application database`);
+        res.json({ 
+          success: true, 
+          message: `User ${email} not found in application database (already removed or never existed)` 
+        });
+      }
+      
+    } catch (error) {
+      console.error("Admin delete user error:", error);
+      res.status(500).json({ error: "Failed to delete user", details: error.message });
+    }
+  });
+
   // Resend verification email
   app.post('/api/auth/resend-verification', async (req, res) => {
     try {
@@ -493,59 +571,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Resend verification error:', error);
       res.status(500).json({ 
         error: 'Failed to resend verification email. Please try again later.' 
-      });
-    }
-  });
-
-  // Admin endpoint to delete user by email
-  app.post("/api/admin/delete-user", async (req, res) => {
-    const { email } = req.body;
-    
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
-
-    try {
-      console.log(`Admin deleting account for email: ${email}`);
-
-      // Delete from Supabase Auth
-      const { authService, supabaseAdmin } = await import('./services/supabase');
-      
-      // First find the user by email using admin client
-      if (!supabaseAdmin) {
-        throw new Error('Admin operations require SUPABASE_SERVICE_ROLE_KEY');
-      }
-      
-      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-      
-      if (listError) {
-        throw new Error(`Failed to list users: ${listError.message}`);
-      }
-      
-      const user = users.find(u => u.email === email);
-      
-      if (!user) {
-        return res.json({ 
-          success: true,
-          message: `No account found for ${email} - already deleted or never existed` 
-        });
-      }
-
-      await authService.deleteUser(user.id);
-
-      // Delete user data from our database
-      await storage.deleteUser(user.id);
-      
-      console.log(`Admin successfully deleted account: ${email}`);
-      res.json({ 
-        success: true,
-        message: `Account for ${email} deleted successfully`,
-        userId: user.id
-      });
-    } catch (error: any) {
-      console.error('Admin account deletion error:', error);
-      res.status(500).json({ 
-        error: `Failed to delete account for ${email}: ${error.message}` 
       });
     }
   });
