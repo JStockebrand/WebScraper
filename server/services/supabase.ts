@@ -33,6 +33,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please set SUPABASE_URL and SUPABASE_ANON_KEY.');
 }
 
+if (!supabaseServiceKey) {
+  console.error('⚠️ SUPABASE_SERVICE_ROLE_KEY not found - admin functions will not work');
+} else {
+  console.log('✅ Supabase service role key is available');
+}
+
 // Supabase client is configured and ready
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 

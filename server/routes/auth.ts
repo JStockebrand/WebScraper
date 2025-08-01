@@ -230,6 +230,9 @@ router.post('/generate-verification-link', async (req, res) => {
     }
     
     console.log(`Generating manual verification link for: ${email}`);
+    console.log(`Admin client available: ${!!authService.supabaseAdmin}`);
+    console.log(`Service role key length: ${process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0}`);
+    console.log(`Service role key starts with: ${process.env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 10) || 'undefined'}`);
     
     // Generate verification link using admin API
     if (!authService.supabaseAdmin) {
@@ -238,7 +241,8 @@ router.post('/generate-verification-link', async (req, res) => {
     
     const { data: linkData, error: linkError } = await authService.supabaseAdmin.auth.admin.generateLink({
       type: 'signup',
-      email: email
+      email: email,
+      password: 'temp_password_for_verification' // Required for signup type, but not used since user already exists
     });
     
     if (linkError) {

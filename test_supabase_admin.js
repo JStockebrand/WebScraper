@@ -1,66 +1,74 @@
-// Simple test for Supabase admin operations
+// Test Supabase admin connection directly
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-console.log('Supabase URL:', supabaseUrl);
-console.log('Service key exists:', !!supabaseServiceKey);
-console.log('Service key format:', supabaseServiceKey ? `${supabaseServiceKey.slice(0, 20)}...` : 'N/A');
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Missing required environment variables');
-  process.exit(1);
-}
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
+async function testSupabaseAdmin() {
+  console.log('Testing Supabase Admin Connection...\n');
+  
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  console.log(`URL: ${supabaseUrl ? 'Available' : 'Missing'}`);
+  console.log(`Service Key: ${serviceKey ? `Available (${serviceKey.length} chars, starts with "${serviceKey.substring(0, 10)}")` : 'Missing'}`);
+  
+  if (!supabaseUrl || !serviceKey) {
+    console.error('❌ Missing required environment variables');
+    return;
   }
-});
-
-async function testAdminConnection() {
+  
   try {
-    console.log('\n🔍 Testing admin connection...');
+    // Create admin client
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
     
-    // Try to list users (this requires service role key)
-    const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({
+    console.log('✅ Admin client created');
+    
+    // Test a simple admin operation
+    console.log('Testing admin functionality...');
+    
+    const { data: users, error } = await supabaseAdmin.auth.admin.listUsers({
       page: 1,
-      perPage: 5
+      perPage: 1
     });
     
     if (error) {
-      console.error('❌ Admin operation failed:', error.message);
-      console.error('Full error:', error);
-      return false;
+      console.error('❌ Admin test failed:', error.message);
+      if (error.message.includes('Invalid API key')) {
+        console.log('\n🔍 DIAGNOSIS: Service role key is invalid or incorrect');
+        console.log('Please verify:');
+        console.log('1. Key copied correctly from Supabase Dashboard > Settings > API');
+        console.log('2. Using the "service_role" key (not anon key)');
+        console.log('3. Key starts with "eyJ" and is very long');
+      }
+    } else {
+      console.log('✅ Admin connection working! Found users:', users?.users?.length || 0);
+      
+      // Test generating a verification link
+      const testEmail = 'admin.test@example.com';
+      console.log(`\nTesting verification link generation for: ${testEmail}`);
+      
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'signup',
+        email: testEmail
+      });
+      
+      if (linkError) {
+        console.error('❌ Link generation failed:', linkError.message);
+      } else {
+        console.log('✅ Verification link generated successfully!');
+        console.log(`Link domain: ${new URL(linkData.properties.action_link).hostname}`);
+      }
     }
     
-    console.log(`✅ Admin connection successful! Found ${users.length} users`);
-    
-    // Look for the specific users we want to delete
-    const targetEmails = ['jwstock3921@gmail.com', 'jwstockebrand@gmail.com'];
-    const foundUsers = users.filter(user => targetEmails.includes(user.email));
-    
-    console.log(`🎯 Found ${foundUsers.length} target users:`);
-    foundUsers.forEach(user => {
-      console.log(`   - ${user.email} (ID: ${user.id})`);
-    });
-    
-    return true;
-    
   } catch (error) {
-    console.error('❌ Connection test failed:', error.message);
-    return false;
+    console.error('❌ Test failed:', error.message);
   }
 }
 
-// Run the test
-testAdminConnection().then(success => {
-  if (success) {
-    console.log('\n✅ Admin connection test passed');
-  } else {
-    console.log('\n❌ Admin connection test failed');
-    process.exit(1);
-  }
-});
+testSupabaseAdmin().then(() => {
+  console.log('\nTest complete.');
+  process.exit(0);
+}).catch(console.error);
