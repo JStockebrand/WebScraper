@@ -141,7 +141,16 @@ router.post('/login', async (req, res) => {
     });
   } catch (error: any) {
     console.error('Login error:', error);
-    res.status(401).json({ error: error.message });
+    
+    // Handle specific case of orphaned accounts
+    if (error.message?.includes('Invalid login credentials')) {
+      res.status(401).json({ 
+        error: "Invalid login credentials. If you believe this account should exist, please contact support or try registering a new account.",
+        code: "INVALID_CREDENTIALS"
+      });
+    } else {
+      res.status(401).json({ error: error.message });
+    }
   }
 });
 
