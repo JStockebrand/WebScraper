@@ -1,69 +1,155 @@
-// Test complete verification flow to confirm Supabase integration
-const baseUrl = 'http://localhost:5000';
+// Verify complete removal of test accounts and API functionality
+import { createClient } from '@supabase/supabase-js';
 
-async function testSupabaseVerificationFlow() {
-  console.log('Testing Supabase verification integration...\n');
+async function verifyCompleteRemoval() {
+  console.log('VERIFYING COMPLETE TEST ACCOUNT REMOVAL & API FIXES\n');
   
-  const testEmail = 'verification.test@gmail.com';
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   
-  // Step 1: Try to generate verification link
-  console.log('1. Generating verification link...');
+  const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  });
   
   try {
-    const linkResponse = await fetch(`${baseUrl}/api/auth/generate-verification-link`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: testEmail })
+    // Step 1: Check Supabase Auth
+    console.log('1. CHECKING SUPABASE AUTH ACCOUNTS');
+    console.log('==================================');
+    
+    const { data: users, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (usersError) {
+      console.log('❌ Failed to get Auth users:', usersError.message);
+      return;
+    }
+    
+    const testAccounts = users.users.filter(user => {
+      const email = user.email.toLowerCase();
+      return email.includes('test') || 
+             email.includes('timing') || 
+             email.includes('complete') || 
+             email.includes('verification') || 
+             email.includes('debug') || 
+             email.includes('final') ||
+             email.includes('flow');
     });
     
-    const linkResult = await linkResponse.text();
-    console.log(`Response status: ${linkResponse.status}`);
-    console.log(`Response headers: ${linkResponse.headers.get('content-type')}`);
-    console.log(`Response body: ${linkResult.substring(0, 200)}...`);
+    const realAccounts = users.users.filter(user => {
+      const email = user.email.toLowerCase();
+      return !email.includes('test') && 
+             !email.includes('timing') && 
+             !email.includes('complete') && 
+             !email.includes('verification') && 
+             !email.includes('debug') && 
+             !email.includes('final') &&
+             !email.includes('flow');
+    });
     
-    if (linkResponse.headers.get('content-type')?.includes('application/json')) {
-      const jsonResult = JSON.parse(linkResult);
-      if (jsonResult.verificationLink) {
-        console.log('✅ Verification link generated successfully');
-        console.log(`Link: ${jsonResult.verificationLink.substring(0, 100)}...`);
+    console.log(`Total Auth accounts: ${users.users.length}`);
+    console.log(`Test accounts remaining: ${testAccounts.length}`);
+    console.log(`Real accounts: ${realAccounts.length}`);
+    
+    if (testAccounts.length === 0) {
+      console.log('✅ All test accounts successfully removed from Supabase Auth');
+    } else {
+      console.log('⚠️  Test accounts still exist:');
+      testAccounts.forEach(user => console.log(`   - ${user.email}`));
+    }
+    
+    if (realAccounts.length > 0) {
+      console.log('✅ Real accounts preserved:');
+      realAccounts.forEach(user => {
+        console.log(`   - ${user.email} (verified: ${!!user.email_confirmed_at})`);
+      });
+    }
+    
+    // Step 2: Test API endpoints
+    console.log('\n2. TESTING API ENDPOINTS');
+    console.log('=========================');
+    
+    // Test users API endpoint
+    const usersResponse = await fetch('http://localhost:5000/api/users');
+    console.log(`GET /api/users status: ${usersResponse.status}`);
+    
+    if (usersResponse.ok) {
+      const dbUsers = await usersResponse.json();
+      console.log(`✅ Users API working - found ${dbUsers.length} user profiles`);
+      
+      if (Array.isArray(dbUsers)) {
+        const testProfiles = dbUsers.filter(user => {
+          const email = user.email.toLowerCase();
+          return email.includes('test') || 
+                 email.includes('timing') || 
+                 email.includes('complete') || 
+                 email.includes('verification') || 
+                 email.includes('debug') || 
+                 email.includes('final') ||
+                 email.includes('flow');
+        });
         
-        // Step 2: Test if we can attempt verification (just check the link structure)
-        const linkUrl = new URL(jsonResult.verificationLink);
-        console.log(`Domain: ${linkUrl.hostname}`);
-        console.log(`Path: ${linkUrl.pathname}`);
-        console.log(`Has token: ${linkUrl.searchParams.has('token')}`);
+        console.log(`Test profiles in database: ${testProfiles.length}`);
         
-        if (linkUrl.hostname.includes('supabase.co') && linkUrl.pathname.includes('verify')) {
-          console.log('✅ Link structure confirms official Supabase verification');
+        if (testProfiles.length === 0) {
+          console.log('✅ All test profiles removed from database');
         } else {
-          console.log('⚠️ Link structure does not match expected Supabase format');
+          console.log('⚠️  Test profiles still exist in database:');
+          testProfiles.forEach(user => console.log(`   - ${user.email}`));
         }
-      } else {
-        console.log('❌ No verification link in response');
       }
     } else {
-      console.log('❌ Response is HTML instead of JSON - endpoint not working');
+      const errorText = await usersResponse.text();
+      console.log('❌ Users API failed:', errorText.substring(0, 200));
+    }
+    
+    // Test health endpoint
+    const healthResponse = await fetch('http://localhost:5000/api/health');
+    console.log(`GET /api/health status: ${healthResponse.status}`);
+    
+    if (healthResponse.ok) {
+      const healthData = await healthResponse.json();
+      console.log('✅ Health endpoint working');
+      console.log(`   Available endpoints: ${Object.keys(healthData.endpoints).length}`);
+    }
+    
+    // Step 3: Final assessment
+    console.log('\n3. FINAL ASSESSMENT');
+    console.log('===================');
+    
+    const issues = [];
+    const successes = [];
+    
+    if (testAccounts.length === 0) {
+      successes.push('Test accounts cleaned from Supabase Auth');
+    } else {
+      issues.push(`${testAccounts.length} test accounts remain in Auth`);
+    }
+    
+    if (usersResponse.ok) {
+      successes.push('Users API endpoint working correctly');
+    } else {
+      issues.push('Users API endpoint returning errors');
+    }
+    
+    if (realAccounts.length > 0) {
+      successes.push('Real user accounts preserved');
+    }
+    
+    console.log('\n✅ WORKING CORRECTLY:');
+    successes.forEach(success => console.log(`   - ${success}`));
+    
+    if (issues.length > 0) {
+      console.log('\n⚠️  REMAINING ISSUES:');
+      issues.forEach(issue => console.log(`   - ${issue}`));
+    } else {
+      console.log('\n🎉 ALL CLEANUP AND FIXES COMPLETED SUCCESSFULLY!');
     }
     
   } catch (error) {
-    console.error('❌ Error testing verification:', error.message);
+    console.error('❌ Verification failed:', error.message);
   }
-  
-  console.log('\n📋 VERIFICATION FLOW ANALYSIS:');
-  console.log('- Manual link generation bypasses email timing issue');
-  console.log('- Generated links use official Supabase verification endpoints');
-  console.log('- Account verification happens through Supabase Auth system');
-  console.log('- Same security and validation as email-delivered links');
-  console.log('\n✅ Confirmation: This process maintains full Supabase integration');
 }
 
-// Add fetch polyfill
-global.fetch = global.fetch || (async (...args) => {
-  const { default: fetch } = await import('node-fetch');
-  return fetch(...args);
-});
-
-testSupabaseVerificationFlow().then(() => {
-  console.log('\nVerification flow test complete.');
+verifyCompleteRemoval().then(() => {
+  console.log('\nVerification complete.');
   process.exit(0);
 }).catch(console.error);

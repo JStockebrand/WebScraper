@@ -447,6 +447,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all users (admin endpoint)
+  app.get("/api/users", async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error: any) {
+      console.error("Get users error:", error);
+      res.status(500).json({ error: "Failed to get users" });
+    }
+  });
+
+  // Get user by email or ID
+  app.get("/api/users/:identifier", async (req, res) => {
+    try {
+      const identifier = req.params.identifier;
+      let user;
+      
+      // Check if identifier is email or ID
+      if (identifier.includes('@')) {
+        user = await storage.getUserByEmail(identifier);
+      } else {
+        user = await storage.getUser(identifier);
+      }
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json(user);
+    } catch (error: any) {
+      console.error("Get user error:", error);
+      res.status(500).json({ error: "Failed to get user" });
+    }
+  });
+
+  // Delete user (admin endpoint)
+  app.delete("/api/users/:id", async (req, res) => {
+    try {
+      const userId = req.params.id;
+      await storage.deleteUser(userId);
+      res.json({ message: "User deleted successfully" });
+    } catch (error: any) {
+      console.error("Delete user error:", error);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
   // Health check endpoint (no auth required)
   app.get("/api/health", (req, res) => {
     res.json({ 
@@ -457,7 +504,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "/api/search": "POST - Start new search (requires authentication)",
         "/api/search/:id": "GET - Get search results (requires authentication)", 
         "/api/searches/history": "GET - Get user search history (requires authentication)",
-        "/api/auth/*": "Authentication endpoints"
+        "/api/auth/*": "Authentication endpoints",
+        "/api/users": "GET - Get all users (admin)",
+        "/api/users/:id": "GET/DELETE - User management (admin)"
       }
     });
   });

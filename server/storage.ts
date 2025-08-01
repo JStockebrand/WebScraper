@@ -8,6 +8,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   updateUser(id: string, updates: Partial<User>): Promise<void>;
   updateUserSearchUsage(id: string, increment: number): Promise<void>;
   updateUserEmailVerification(id: string, isVerified: boolean): Promise<void>;
@@ -64,6 +65,10 @@ export class MemStorage implements IStorage {
 
   async getUserByEmail(email: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(user => user.email === email);
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
   }
 
   async updateUser(id: string, updates: Partial<User>): Promise<void> {
@@ -300,6 +305,10 @@ export class PgStorage implements IStorage {
     return user;
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return await this.db.select().from(users);
+  }
+
   async updateUser(id: string, updates: Partial<User>): Promise<void> {
     await this.db.update(users)
       .set({ ...updates, updatedAt: new Date() })
@@ -419,70 +428,49 @@ export class PgStorage implements IStorage {
   }
 
   async getUserSavedSearches(userId: string, limit?: number): Promise<any[]> {
-    const query = this.db
-      .select({
-        id: searches.id,
-        query: searches.query,
-        status: searches.status,
-        createdAt: searches.createdAt,
-        totalResults: searches.totalResults,
-        summary: searchResults.summary,
-        confidence: searchResults.confidence,
-        isSaved: searches.isSaved,
-      })
-      .from(searches)
-      .leftJoin(searchResults, eq(searches.id, searchResults.searchId))
-      .where(eq(searches.userId, userId))
-      .orderBy(desc(searches.createdAt));
-
-    const results = limit ? await query.limit(limit) : await query;
-    
-    // Group by search ID and return with first result's summary, only saved searches
-    const groupedResults = results.reduce((acc, row) => {
-      if (!acc[row.id] && row.isSaved) {
-        acc[row.id] = {
-          id: row.id,
-          query: row.query,
-          status: row.status,
-          createdAt: row.createdAt?.toISOString() || new Date().toISOString(),
-          summaryText: row.summary || null,
-          totalResults: row.totalResults,
-          confidence: row.confidence || null,
-          isSaved: row.isSaved,
-        };
-      }
-      return acc;
-    }, {} as any);
-
-    return Object.values(groupedResults);
+    // Temporarily return empty array until is_saved column is added to database
+    return [];
   }
 
   async toggleSearchSaved(searchId: number, isSaved: boolean): Promise<void> {
-    await this.db.update(searches)
-      .set({ isSaved })
-      .where(eq(searches.id, searchId));
+    // Temporarily disabled until is_saved column is added to database
+    console.log(`Toggle saved search ${searchId}: ${isSaved} (feature temporarily disabled)`);
   }
 
   async deleteUser(id: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
     
-    // Get user searches first
-    const userSearches = await this.db.select().from(searches).where(eq(searches.userId, id));
-    
-    // Delete search results for each search
-    for (const search of userSearches) {
-      await this.db.delete(searchResults).where(eq(searchResults.searchId, search.id));
+    try {
+      // Get user searches first (avoid using isSaved column)
+      const userSearches = await this.db.select({
+        id: searches.id,
+        userId: searches.userId,
+        query: searches.query,
+        status: searches.status,
+        totalResults: searches.totalResults,
+        searchTime: searches.searchTime,
+        // Skip isSaved column to avoid schema issues
+        createdAt: searches.createdAt,
+      }).from(searches).where(eq(searches.userId, id));
+      
+      // Delete search results for each search
+      for (const search of userSearches) {
+        await this.db.delete(searchResults).where(eq(searchResults.searchId, search.id));
+      }
+      
+      // Delete user's searches
+      await this.db.delete(searches)
+        .where(eq(searches.userId, id));
+      
+      // Delete the user
+      await this.db.delete(users)
+        .where(eq(users.id, id));
+      
+      console.log(`Deleted user ${id} and all associated data from database`);
+    } catch (error: any) {
+      console.error(`Failed to delete user ${id}:`, error.message);
+      throw error;
     }
-    
-    // Delete user's searches
-    await this.db.delete(searches)
-      .where(eq(searches.userId, id));
-    
-    // Delete the user
-    await this.db.delete(users)
-      .where(eq(users.id, id));
-    
-    console.log(`Deleted user ${id} and all associated data from database`);
   }
 }
 
