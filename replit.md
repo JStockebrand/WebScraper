@@ -11,6 +11,8 @@ Preferred communication style: Simple, everyday language.
 - Remove from users table in database
 - Clean up all related data (searches, search results, etc.)
 
+**Solution Approach Preference**: Prioritize Supabase configuration changes over custom workarounds. When facing authentication or email verification issues, first investigate and recommend appropriate Supabase dashboard settings rather than building manual solutions.
+
 ## System Architecture
 
 ### Full-Stack Structure
@@ -34,7 +36,7 @@ Preferred communication style: Simple, everyday language.
     - **Scraper Service**: Content extraction with Cheerio.
     - **OpenAI Service**: AI-powered content summarization.
 - **Storage Layer**: Abstracted storage interface with memory fallback.
-- **Authentication**: Full user authentication with Supabase Auth, including email/password registration, login, and secure password reset. Supports email verification.
+- **Authentication**: Full user authentication with Supabase Auth, including email/password registration, login, and secure password reset. Email verification configured via Supabase settings (Confirm email: ON) for consistent verification flow.
 - **Security**: Row Level Security (RLS) policies implemented for data isolation, ensuring users only access their own data. Service role permissions are configured for backend and admin functions.
 - **Stripe Integration**: Implemented Stripe Checkout for subscription management (Pro and Premium plans) with webhook-based fulfillment and idempotent processing.
 
