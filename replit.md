@@ -1,251 +1,65 @@
 # WebScrape Summarizer
 
 ## Overview
-
-This is a full-stack web application that allows users to search the web, scrape content from search results, and generate AI-powered summaries of the found content. The application provides a clean interface for entering search queries and displays comprehensive results with metadata, scraping status, and AI-generated summaries.
-
-## System Architecture
-
-### Full-Stack Structure
-- **Frontend**: React-based SPA with TypeScript and Vite
-- **Backend**: Express.js server with TypeScript
-- **Database**: PostgreSQL with Drizzle ORM
-- **Build System**: Vite for frontend, ESBuild for backend
-- **UI Framework**: shadcn/ui components with Tailwind CSS
-
-### Deployment Environment
-- **Platform**: Replit with autoscale deployment
-- **Runtime**: Node.js 20
-- **Database**: PostgreSQL 16 module
-- **Port Configuration**: Internal port 5000, external port 80
-
-## Key Components
-
-### Frontend Architecture
-- **React Router**: Using Wouter for client-side routing
-- **State Management**: TanStack Query for server state management
-- **UI Components**: shadcn/ui component library with Radix UI primitives
-- **Styling**: Tailwind CSS with CSS variables for theming
-- **Form Handling**: React Hook Form with Zod validation
-
-### Backend Architecture
-- **Express Server**: RESTful API with TypeScript
-- **Database Layer**: Drizzle ORM with PostgreSQL
-- **Service Layer**: 
-  - Search Service: Web search functionality via SERP API
-  - Scraper Service: Content extraction with Cheerio
-  - OpenAI Service: AI-powered content summarization
-- **Storage Layer**: Abstracted storage interface with memory fallback
-
-### Database Schema
-- **Searches Table**: Tracks search queries, status, and metadata
-- **Search Results Table**: Stores scraped content, summaries, and confidence scores
-- **Status Tracking**: Comprehensive status fields for search and scraping operations
-
-## Data Flow
-
-1. **User Search**: User submits search query through React form
-2. **Search Initiation**: Backend creates search record and returns search ID
-3. **Async Processing**: 
-   - Web search via SERP API
-   - Content scraping with Cheerio
-   - AI summarization with OpenAI
-4. **Status Updates**: Real-time status updates via polling
-5. **Results Display**: Frontend shows results with metadata and summaries
-
-## External Dependencies
-
-### Required API Keys
-- **SERP API**: Web search functionality (SERP_API_KEY or SEARCH_API_KEY)
-- **OpenAI API**: Content summarization (OPENAI_API_KEY or OPENAI_KEY)
-- **Database**: PostgreSQL connection (DATABASE_URL)
-
-### Key Libraries
-- **Frontend**: React, Vite, TanStack Query, Wouter, Tailwind CSS
-- **Backend**: Express, Drizzle ORM, Cheerio, OpenAI SDK
-- **Database**: PostgreSQL with Neon serverless driver
-- **UI**: shadcn/ui with Radix UI primitives
-
-### Development Tools
-- **TypeScript**: Full type safety across the stack
-- **ESLint/Prettier**: Code formatting and linting
-- **Vite**: Fast development server and building
-- **Drizzle Kit**: Database migrations and schema management
-
-## Deployment Strategy
-
-### Build Process
-- **Frontend**: Vite builds React app to `dist/public`
-- **Backend**: ESBuild bundles server to `dist/index.js`
-- **Database**: Drizzle migrations applied via `npm run db:push`
-
-### Environment Configuration
-- **Development**: `npm run dev` - runs server with Vite middleware
-- **Production**: `npm run start` - serves built assets and API
-- **Database**: Uses environment variable for connection string
-
-### Replit Configuration
-- **Modules**: Node.js 20, Web, PostgreSQL 16
-- **Deployment**: Autoscale with health checks on port 5000
-- **Workflows**: Automated startup with port waiting
-
-## Recent Changes
-- July 28, 2025: SUPABASE REDIRECT URL SYSTEM - Complete Implementation Following Official Documentation:
-  - Implemented dynamic URL generation for production and development environments
-  - Added proper authentication parameter parsing (query params and hash fragments)
-  - Enhanced error handling for authentication failures with user-friendly messages
-  - Created environment-aware redirect URLs following Supabase best practices
-  - Added support for multiple authentication types: email verification, password reset, OAuth
-  - Updated all authentication flows to use dynamic URLs instead of hardcoded paths
-  - Created comprehensive configuration guide for Supabase dashboard URL settings
-  - Added automatic URL cleanup after authentication processing
-  - Enhanced password reset flow with proper session verification and redirection
-  - All redirect functionality now follows Supabase documentation standards
-- July 28, 2025: SECURITY AND ACCOUNT MANAGEMENT - Complete Implementation:
-  - Successfully implemented delete account functionality in user settings
-  - Added confirmation dialog requiring "DELETE" confirmation text
-  - Created admin endpoint for email-based account deletion 
-  - Enhanced Supabase service with admin client for user management
-  - Added proper cleanup of user data from both Supabase Auth and application database
-  - Deleted specific test accounts: jwstock3921@gmail.com and jwstockebrand@gmail.com
-  - Account deletion is now available to signed-in users in the "Danger Zone" section
-  - Complete data removal includes searches, results, subscription info, and user profile
-  - FIXED RLS SECURITY ISSUES: Created comprehensive Row Level Security policies for all tables
-  - Added proper data access controls ensuring users can only access their own data
-  - Configured service role permissions for backend operations and admin functions
-  - IDENTIFIED EMAIL VERIFICATION ISSUE: Email confirmation disabled in Supabase dashboard
-  - Updated registration flow to properly handle verification status based on Supabase settings
-  - Added resend verification email functionality and improved password reset system
-  - Created comprehensive fix guide for enabling email verification in Supabase dashboard
-  - PROVIDED STEP-BY-STEP GUIDE: Complete instructions to enable email verification in Supabase
-  - Email verification system ready - requires one-time Supabase dashboard configuration change
-- July 23, 2025: EMAIL VERIFICATION SYSTEM - Complete Implementation:
-  - Implemented email verification flow immediately after user registration
-  - Created EmailVerificationDialog component for user guidance through verification process
-  - Added resend verification email functionality with proper error handling
-  - Enhanced registration flow to detect when email verification is required
-  - Updated AuthContext to handle email verification responses from backend
-  - Added verification success detection via URL parameters for seamless user experience
-  - Created comprehensive email verification UI with step-by-step instructions
-  - Integrated verification system with existing password reset functionality
-  - **IMPORTANT**: Email verification now required for new users before full account access
-  - Password reset functionality now works properly for verified email addresses
-- July 22, 2025: REGISTRATION SYSTEM - Complete Fix and Enhancement:
-  - Fixed critical registration database error that was preventing new account creation
-  - Re-implemented strong password requirements: 8+ characters, uppercase, lowercase, number, special character
-  - Added comprehensive password validation using Zod schema with regex patterns  
-  - Enhanced registration form with clear password requirements list for better user experience
-  - Server-side validation properly enforces all password security rules with user-friendly error messages
-  - Cleared conflicting test data and improved database handling for smooth user registration
-  - Registration system now fully functional with both weak password rejection and strong password acceptance
-- July 22, 2025: FORGOT PASSWORD FUNCTIONALITY - Implementation with Email Verification Requirement:
-  - Added "Forgot password?" link to the login form for easy access
-  - Created popup dialog with email entry form for password reset requests
-  - Implemented secure password reset flow using Supabase Auth
-  - Added comprehensive error handling for unverified email addresses
-  - Created confirmation screen with verification requirements messaging
-  - Enhanced login form with forgot password integration and improved UX
-  - **IMPORTANT**: Password reset requires email verification - Supabase only sends reset emails to confirmed addresses
-  - Added clear messaging to users about email verification requirement
-  - Implemented graceful fallback messaging for security when emails are unverified
-- July 22, 2025: ENHANCED USER DATA CAPTURE - Complete Supabase Integration:
-  - Enhanced user data synchronization ensuring all users have profiles in Supabase tables
-  - Comprehensive user sync service managing email, subscription status, and Stripe data
-  - Automatic user profile creation during registration and sign-in for data consistency
-  - Updated database schema to capture subscription status, Stripe IDs, and search limits
-  - Created user data validation tests to verify complete information capture
-  - Added Supabase triggers for automatic user profile creation on auth user creation
-  - All user accounts now properly capture: email, password (via Supabase Auth), subscription status
-- July 22, 2025: STRIPE CHECKOUT FULFILLMENT - Complete Integration Following Stripe Docs:
-  - Implemented Stripe Checkout with hosted payment pages (following Stripe's fulfillment documentation)
-  - Built automatic fulfillment system using webhooks (checkout.session.completed events)
-  - Added dual fulfillment system (webhook + redirect) for maximum reliability with idempotent processing
-  - Created comprehensive webhook handling with raw body middleware for signature verification
-  - Implemented full Stripe payment processing with subscription tiers
-  - Added Pro ($9.99/month, 100 searches) and Premium ($19.99/month, 500 searches) plans
-  - Created secure payment flow with Stripe Elements for card processing
-  - Built subscription management (create, cancel, view details)
-  - Added comprehensive Stripe service layer with customer/subscription handling
-  - Updated database schema with Stripe customer and subscription tracking
-  - Created dedicated subscription page (/subscribe) with plan selection
-  - Enhanced user menu with "Upgrade Plan" option
-  - Integrated payment confirmation and subscription activation
-  - Added comprehensive testing guide for safe development testing
-  - All payments in TEST MODE for safe development and testing
-- July 20, 2025: UPDATED USER EXPERIENCE - Homepage and Password Security:
-  - Made homepage accessible without login - search bar now visible to all visitors
-  - Added informational message prompting visitors to create account for search functionality
-  - Enhanced password security requirements: 8+ characters, uppercase, number, special character
-  - Search functionality still requires authentication but users can see the interface first
-  - Maintained all existing authentication and subscription features
-  - PRIVACY PROTECTION: All search endpoints require authentication - no data is saved for non-logged-in users
-  - Added explicit messaging that search history and results are only saved when logged in
-  - Enhanced error messages to clarify authentication requirement for search functionality
-- July 19, 2025: COMPLETE SUPABASE INTEGRATION - User Authentication System:
-  - Implemented full user authentication with Supabase Auth
-  - Added user accounts with email/password registration and login
-  - Created comprehensive database schema: users, searches, search_results tables
-  - Implemented Row Level Security policies for data isolation
-  - Added subscription tiers (free: 10 searches/month, pro/premium for future)
-  - Protected all search endpoints with user authentication
-  - Added personal search history and usage tracking
-  - Created authentication context and protected routes in frontend
-  - Integrated user menu with subscription status and search quota display
-  - Added automatic user profile creation on signup
-  - Fixed connection string handling for Supabase PostgreSQL
-- July 13, 2025: MAJOR OPTIMIZATION - Consolidated Summary Approach:
-  - Reduced OpenAI API calls from 10+ to just 1 per search (massive quota savings)
-  - All scraped content now combined into single comprehensive summary
-  - Enhanced summarizeService with new summarizeMultipleContent() method
-  - Updated routes.ts to use consolidated approach instead of individual summaries
-  - Frontend updated to reflect "consolidated analysis from X sources"
-  - Maintains same functionality while minimizing API quota impact
-  - Added consolidated fallback summary generation for quota exhaustion
-- July 11, 2025: Application prepared for deployment:
-  - Verified complete functionality with search, scraping, and AI summarization
-  - Cleaned up debug logs and optimized performance
-  - Added comprehensive documentation (README.md) and environment setup (.env.example)
-  - Application is production-ready for Replit Core deployment
-- July 6, 2025: Enhanced search quality and filtering:
-  - Increased SerpAPI search from 5 to 10 URLs for broader coverage
-  - Added confidence-based filtering to only display summaries >80% confidence
-  - Updated scraper with improved content extraction and confidence scoring
-  - Enhanced UI to show filtered high-quality results count vs total sources
-- July 2, 2025: Simplified application to core functionality:
-  - Streamlined UI to single search input and results view
-  - Removed complex navigation, loading states, and error handling components
-  - Consolidated frontend into single-page application with minimal UI
-  - Focused on core flow: search topic → find URLs → scrape → summarize
-  - Clean card-based results display with essential information only
-- July 1, 2025: Enhanced OpenAI integration with comprehensive quota management:
-  - Created new summarize.ts service with intelligent quota handling
-  - Switched to gpt-3.5-turbo for cost optimization (from gpt-4o)
-  - Added comprehensive logging for 429 errors and usage tracking
-  - Implemented 5-minute cooldown after quota exhaustion
-  - Added API endpoints for usage statistics (/api/openai/stats)
-  - Enhanced fallback summary generation with SEO keyword extraction
-  - Added metadata extraction (topic categorization, entity recognition)
-  - Implemented advanced keyword extraction with stop-word filtering
-  - Updated database schema to store keywords and metadata fields
-- July 1, 2025: Integrated SerpAPI Google Search for real search results:
-  - Replaced mock search data with actual Google search API
-  - Added SERP_API_KEY secret configuration
-  - Verified complete search-to-summary pipeline functionality
-- June 25, 2025: Optimized OpenAI API usage to minimize quota impact:
-  - Search engine now finds and validates top 5 links first
-  - OpenAI API only processes successfully scraped content (saving failed scrapes from using quota)
-  - Added logging to show API call savings in real-time
-- June 25, 2025: Fixed 3 breaking changes for production deployment:
-  - Updated fetch API to use AbortController instead of deprecated timeout option
-  - Resolved TypeScript storage interface type mismatches with proper null handling
-  - Added intelligent fallback summary system for OpenAI quota limitations
-- June 25, 2025: Initial setup
+This full-stack web application enables users to search the web, scrape content from search results, and generate AI-powered summaries. The project aims to provide a clean interface for comprehensive search results, including metadata, scraping status, and AI summaries, with a vision for future subscription-based services and advanced features.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
 
 **Account Deletion Protocol**: When user requests to remove/delete emails or accounts from Supabase, perform complete deletion including:
 - Remove from Supabase Auth system
 - Remove from users table in database
 - Clean up all related data (searches, search results, etc.)
+
+## System Architecture
+
+### Full-Stack Structure
+- **Frontend**: React-based SPA with TypeScript and Vite, using shadcn/ui components and Tailwind CSS.
+- **Backend**: Express.js server with TypeScript.
+- **Database**: PostgreSQL with Drizzle ORM.
+- **Deployment**: Replit with autoscale deployment, Node.js 20 runtime, and PostgreSQL 16 module.
+
+### Frontend Architecture
+- **Routing**: Wouter for client-side routing.
+- **State Management**: TanStack Query for server state.
+- **UI/UX**: shadcn/ui component library with Radix UI primitives, styled with Tailwind CSS (CSS variables for theming).
+- **Form Handling**: React Hook Form with Zod validation.
+- **User Experience**: Homepage accessible without login, but search functionality requires authentication. Informational messages guide users to create an account. All search endpoints require authentication; no data is saved for non-logged-in users.
+
+### Backend Architecture
+- **API**: RESTful API built with Express.
+- **Database Layer**: Drizzle ORM for PostgreSQL.
+- **Service Layers**:
+    - **Search Service**: Web search via SERP API.
+    - **Scraper Service**: Content extraction with Cheerio.
+    - **OpenAI Service**: AI-powered content summarization.
+- **Storage Layer**: Abstracted storage interface with memory fallback.
+- **Authentication**: Full user authentication with Supabase Auth, including email/password registration, login, and secure password reset. Supports email verification.
+- **Security**: Row Level Security (RLS) policies implemented for data isolation, ensuring users only access their own data. Service role permissions are configured for backend and admin functions.
+- **Stripe Integration**: Implemented Stripe Checkout for subscription management (Pro and Premium plans) with webhook-based fulfillment and idempotent processing.
+
+### Database Schema
+- **Tables**: `Searches` (tracks queries, status, metadata) and `Search Results` (stores scraped content, summaries, confidence scores).
+- **User Data**: Captures subscription status, Stripe IDs, and search limits.
+- **Data Flow**: User submits a search, backend initiates async processing (web search, scraping, AI summarization), and real-time status updates are provided. OpenAI API calls are consolidated to one per search for efficiency.
+
+## External Dependencies
+
+### Required API Keys
+- **SERP API**: `SERP_API_KEY` or `SEARCH_API_KEY`
+- **OpenAI API**: `OPENAI_API_KEY` or `OPENAI_KEY`
+- **Database**: PostgreSQL connection via `DATABASE_URL`
+
+### Key Libraries
+- **Frontend**: React, Vite, TanStack Query, Wouter, Tailwind CSS.
+- **Backend**: Express, Drizzle ORM, Cheerio, OpenAI SDK.
+- **Database**: PostgreSQL with Neon serverless driver.
+- **UI**: shadcn/ui with Radix UI primitives.
+- **Authentication**: Supabase Auth.
+- **Payments**: Stripe.
+
+### Development Tools
+- **TypeScript**: For full type safety.
+- **ESLint/Prettier**: For code formatting and linting.
+- **Vite**: For fast development and building.
+- **Drizzle Kit**: For database migrations and schema management.
