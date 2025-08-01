@@ -18,13 +18,21 @@ router.post('/register', async (req, res) => {
     }
 
     // Check if email verification is required
-    if (!authResponse.session || authResponse.needsVerification) {
+    if (!authResponse.session || authResponse.emailVerificationRequired) {
       // User needs to verify email before getting a session
-      return res.json({
+      const response: any = {
         message: 'Registration successful! Please check your email and click the verification link to complete your account setup.',
         emailVerificationRequired: true,
         email: authResponse.user.email,
-      });
+      };
+      
+      // Include immediate verification link if available (workaround for timing issue)
+      if (authResponse.immediateVerificationLink) {
+        response.immediateVerificationLink = authResponse.immediateVerificationLink;
+        response.message = 'Registration successful! Due to email timing issues, you can use the direct verification link provided, or wait for the email confirmation.';
+      }
+      
+      return res.json(response);
     }
 
     // Get the user record from our database (created by authService.register)
@@ -209,6 +217,53 @@ router.post('/reset-password', async (req, res) => {
   } catch (error: any) {
     console.error('Password reset error:', error);
     res.status(400).json({ error: error.message });
+  }
+});
+
+// Manual verification link generation (workaround for email timing issue)
+router.post('/generate-verification-link', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    console.log(`Generating manual verification link for: ${email}`);
+    
+    // Generate verification link using admin API
+    if (!authService.supabaseAdmin) {
+      return res.status(500).json({ error: 'Admin client not available' });
+    }
+    
+    const { data: linkData, error: linkError } = await authService.supabaseAdmin.auth.admin.generateLink({
+      type: 'signup',
+      email: email
+    });
+    
+    if (linkError) {
+      console.error('Manual link generation error:', linkError);
+      return res.status(400).json({ 
+        error: 'Failed to generate verification link',
+        details: linkError.message 
+      });
+    }
+    
+    if (!linkData?.properties?.action_link) {
+      return res.status(400).json({ error: 'No verification link generated' });
+    }
+    
+    console.log(`✅ Manual verification link generated for ${email}`);
+    
+    res.json({
+      verificationLink: linkData.properties.action_link,
+      message: 'Verification link generated successfully',
+      instructions: 'Click the verification link to complete account setup'
+    });
+    
+  } catch (error: any) {
+    console.error('Manual verification link error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

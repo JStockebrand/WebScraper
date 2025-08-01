@@ -1,101 +1,109 @@
-// Test the complete email verification flow
-import { storage } from './server/storage.ts';
+// Test the complete verification flow with timing fix
+const baseUrl = 'http://localhost:5000';
 
 async function testCompleteVerificationFlow() {
-  const email = 'jwstock3921@gmail.com';
+  console.log('🧪 Testing Complete Email Verification Flow with Timing Fix\n');
   
-  console.log('Testing complete email verification flow...\n');
+  // Step 1: Test registration
+  console.log('1. Testing registration...');
+  const testEmail = `complete.test.${Date.now()}@gmail.com`;
   
-  // Step 1: Check current user state
-  console.log('1. Current User State:');
   try {
-    const user = await storage.getUserByEmail(email);
-    if (user) {
-      console.log(`   ✓ User exists: ${user.email}`);
-      console.log(`   ID: ${user.id}`);
-      console.log(`   Email Verified: ${user.emailVerified}`);
-      console.log(`   Status: ${user.subscriptionStatus}`);
-      
-      // Step 2: Test login attempt (should fail if not verified)
-      console.log('\n2. Testing Login (Should fail if not verified):');
-      const loginResponse = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email,
-          password: 'NewPassword123!'
-        })
-      });
-      
-      const loginResult = await loginResponse.json();
-      console.log(`   Login Status: ${loginResponse.status}`);
-      console.log(`   Message: ${loginResult.error || loginResult.message || 'Success'}`);
-      
-      if (loginResult.error && loginResult.error.includes('Email not confirmed')) {
-        console.log('   ✓ Email verification requirement is working correctly');
-      }
-      
-    } else {
-      console.log(`   ✗ User not found in application database`);
-    }
-  } catch (error) {
-    console.log(`   Error: ${error.message}`);
-  }
-  
-  // Step 3: Test the verification callback endpoints
-  console.log('\n3. Testing Verification Endpoints:');
-  
-  // Test auth callback
-  try {
-    const authResponse = await fetch('http://localhost:5000/auth?type=signup', {
-      method: 'GET'
-    });
-    console.log(`   /auth callback status: ${authResponse.status}`);
-    
-    if (authResponse.status === 302) {
-      console.log('   ✓ Auth callback redirect working');
-    }
-  } catch (error) {
-    console.log(`   Auth callback error: ${error.message}`);
-  }
-  
-  // Test verify-session endpoint
-  try {
-    const verifyResponse = await fetch('http://localhost:5000/api/auth/verify-session', {
+    const regResponse = await fetch(`${baseUrl}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        accessToken: 'test-token',
-        refreshToken: 'test-refresh'
+        email: testEmail,
+        password: 'TestPassword123!',
+        displayName: 'Complete Test User'
       })
     });
-    console.log(`   /api/auth/verify-session status: ${verifyResponse.status}`);
     
-    if (verifyResponse.status === 401) {
-      console.log('   ✓ Session verification endpoint exists (properly rejecting invalid token)');
+    const regResult = await regResponse.json();
+    
+    if (regResponse.status === 200 && regResult.emailVerificationRequired) {
+      console.log('   ✓ Registration successful');
+      console.log(`   Email: ${regResult.email}`);
+      console.log(`   Verification required: ${regResult.emailVerificationRequired}`);
+      
+      if (regResult.immediateVerificationLink) {
+        console.log('   ✅ TIMING FIX WORKING: Immediate verification link generated');
+        console.log(`   🔗 Link: ${regResult.immediateVerificationLink}`);
+        
+        // Step 2: Test the verification link
+        console.log('\n2. Testing immediate verification link...');
+        try {
+          const verifyResponse = await fetch(regResult.immediateVerificationLink, {
+            method: 'GET',
+            redirect: 'manual' // Don't follow redirects automatically
+          });
+          
+          console.log(`   Verification response status: ${verifyResponse.status}`);
+          console.log(`   Redirect location: ${verifyResponse.headers.get('location')}`);
+          
+          if (verifyResponse.status === 302 || verifyResponse.status === 301) {
+            console.log('   ✅ Verification link working - redirects to app');
+            
+            // Step 3: Test signin after verification
+            console.log('\n3. Testing signin after verification...');
+            const signinResponse = await fetch(`${baseUrl}/api/auth/login`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: testEmail,
+                password: 'TestPassword123!'
+              })
+            });
+            
+            const signinResult = await signinResponse.json();
+            
+            if (signinResponse.status === 200 && signinResult.session) {
+              console.log('   ✅ COMPLETE FLOW SUCCESS: User can signin after verification');
+              console.log(`   User: ${signinResult.session.user.email}`);
+              console.log(`   Session expires: ${signinResult.session.expires_at}`);
+            } else {
+              console.log('   ⚠️ Signin after verification failed');
+              console.log(`   Status: ${signinResponse.status}`);
+              console.log(`   Response: ${JSON.stringify(signinResult, null, 2)}`);
+            }
+          } else {
+            console.log('   ❌ Verification link not working properly');
+          }
+          
+        } catch (verifyError) {
+          console.log('   ❌ Error testing verification link:', verifyError.message);
+        }
+        
+      } else {
+        console.log('   ⚠️ TIMING FIX NOT WORKING: No immediate verification link provided');
+        console.log('   This means the timing issue workaround failed');
+      }
+      
+    } else {
+      console.log('   ❌ Registration failed');
+      console.log(`   Status: ${regResponse.status}`);
+      console.log(`   Response: ${JSON.stringify(regResult, null, 2)}`);
     }
+    
   } catch (error) {
-    console.log(`   Verify session error: ${error.message}`);
+    console.error('   ❌ Registration test failed:', error.message);
   }
   
-  console.log('\n=== Configuration Summary ===');
-  console.log('Current Supabase redirect URL should be:');
-  console.log('http://localhost:5000/auth');
-  console.log('');
-  console.log('The verification flow should work as follows:');
-  console.log('1. User registers → Gets verification email');
-  console.log('2. Clicks email link → Redirected to /auth with tokens');
-  console.log('3. Backend redirects to /?access_token=xxx&refresh_token=xxx&type=signup');
-  console.log('4. Frontend detects tokens → Calls /api/auth/verify-session');
-  console.log('5. User is signed in automatically → Can start searching');
-  console.log('');
-  console.log('Next step: Check your Supabase dashboard email template configuration');
+  console.log('\n📊 TEST SUMMARY:');
+  console.log('- Registration endpoint functionality');
+  console.log('- Immediate verification link generation (timing fix)');
+  console.log('- Verification link functionality');
+  console.log('- Post-verification signin capability');
+  console.log('\n⏱️ This test validates the complete fix for the email timing issue.');
 }
 
-// Add fetch polyfill
+// Add fetch polyfill for Node.js
 global.fetch = global.fetch || (async (...args) => {
   const { default: fetch } = await import('node-fetch');
   return fetch(...args);
 });
 
-testCompleteVerificationFlow().catch(console.error);
+testCompleteVerificationFlow().then(() => {
+  console.log('\n✅ Complete verification flow test finished.');
+  process.exit(0);
+}).catch(console.error);

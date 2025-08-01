@@ -113,13 +113,39 @@ export class AuthService {
     // Check if email verification is required
     const needsVerification = !data.user.email_confirmed_at && !data.session;
     
+    // WORKAROUND for timing issue: Generate immediate verification link
+    let immediateVerificationLink = null;
     if (needsVerification) {
       console.log('🔒 Email verification required - no session created');
       console.log('📧 Verification email should have been sent by Supabase');
+      
+      try {
+        console.log('🔧 Generating immediate verification link due to timing issue...');
+        if (this.supabaseAdmin) {
+          const { data: linkData, error: linkError } = await this.supabaseAdmin.auth.admin.generateLink({
+            type: 'signup',
+            email: data.user.email!
+          });
+          
+          if (!linkError && linkData.properties?.action_link) {
+            immediateVerificationLink = linkData.properties.action_link;
+            console.log('✅ Immediate verification link generated');
+            console.log(`🔗 ${immediateVerificationLink}`);
+          } else {
+            console.log('⚠️ Could not generate immediate verification link:', linkError?.message);
+          }
+        }
+      } catch (linkGenError: any) {
+        console.log('⚠️ Could not generate immediate verification link:', linkGenError.message);
+      }
+    }
+    
+    if (needsVerification) {
       return { 
         user: data.user, 
         session: null,
-        emailVerificationRequired: true 
+        emailVerificationRequired: true,
+        immediateVerificationLink
       };
     } else {
       console.log('✅ User registered and can proceed (verification disabled or already confirmed)');
