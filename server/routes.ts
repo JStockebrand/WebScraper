@@ -36,6 +36,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mount authentication routes
   app.use("/api/auth", authRoutes);
   
+  // Email verification callback endpoint (handles Supabase email confirmation redirects)
+  app.get("/auth", async (req, res) => {
+    const { type, access_token, refresh_token, token_hash, error, error_description } = req.query;
+    
+    // Handle verification errors
+    if (error) {
+      console.error('Email verification error:', { error, error_description });
+      return res.redirect('/auth?error=' + encodeURIComponent(error_description || error));
+    }
+    
+    // Handle email confirmation (type=signup)
+    if (type === 'signup' && access_token && refresh_token) {
+      console.log('Email verification successful - redirecting with tokens');
+      // Redirect to frontend with tokens for automatic sign-in
+      return res.redirect(`/?access_token=${access_token}&refresh_token=${refresh_token}&type=signup`);
+    }
+    
+    // Handle password recovery (type=recovery)
+    if (type === 'recovery' && access_token && refresh_token) {
+      console.log('Password recovery verified - redirecting to reset form');
+      return res.redirect(`/reset-password?access_token=${access_token}&refresh_token=${refresh_token}`);
+    }
+    
+    // Default redirect to auth page
+    console.log('Email verification callback - no tokens, redirecting to auth page');
+    res.redirect('/auth');
+  });
+  
+  // Verify session endpoint for handling email verification tokens
+  app.post("/api/auth/verify-session", async (req, res) => {
+    try {
+      const { accessToken, refreshToken } = req.body;
+      
+      if (!accessToken) {
+        return res.status(400).json({ error: 'Access token required' });
+      }
+      
+      // Verify the token with Supabase
+      const authUser = await authService.verifySession(accessToken);
+      
+      // Get or create user profile in our database
+      let user = await storage.getUser(authUser.id);
+      if (!user) {
+        user = await storage.createUser({
+          id: authUser.id,
+          email: authUser.email!,
+          displayName: authUser.user_metadata?.display_name || authUser.email!.split('@')[0],
+          subscriptionTier: 'free',
+        });
+        console.log(`Created user profile for verified user: ${authUser.email} (${authUser.id})`);
+      }
+      
+      // Update email verification status
+      if (authUser.email_confirmed_at) {
+        await storage.updateUserEmailVerification(authUser.id, true);
+        console.log(`Email verification confirmed for: ${authUser.email}`);
+      }
+      
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          subscriptionTier: user.subscriptionTier,
+          searchesUsed: user.searchesUsed,
+          searchesLimit: user.searchesLimit,
+        },
+        session: { access_token: accessToken, refresh_token: refreshToken },
+        verified: true
+      });
+    } catch (error: any) {
+      console.error('Session verification error:', error);
+      res.status(401).json({ error: 'Invalid session token' });
+    }
+  });
+  
   // Import and register Stripe routes
   const { registerStripeRoutes } = await import("./routes/stripe");
   registerStripeRoutes(app);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, FileText, Loader2, ExternalLink, List, User, LogIn, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserMenu } from "@/components/layout/UserMenu";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 interface SearchResult {
   title: string;
@@ -42,7 +43,61 @@ export default function Home() {
   const [searchData, setSearchData] = useState<SearchData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savingSearch, setSavingSearch] = useState(false);
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  // Handle email verification redirect from Supabase
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const accessToken = urlParams.get('access_token');
+    const refreshToken = urlParams.get('refresh_token');
+    const type = urlParams.get('type');
+
+    if (accessToken && refreshToken && type === 'signup') {
+      handleEmailVerification(accessToken, refreshToken);
+    }
+  }, []);
+
+  const handleEmailVerification = async (accessToken: string, refreshToken: string) => {
+    try {
+      const response = await fetch('/api/auth/verify-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ accessToken, refreshToken }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Update auth context with verified user
+        setUser(data.user);
+        localStorage.setItem('supabase_token', accessToken);
+        
+        // Show success message
+        toast({
+          title: "Welcome!",
+          description: "Your email has been verified and you're now signed in. Start searching below!",
+        });
+        
+        // Clean up URL parameters
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else {
+        throw new Error('Failed to verify email');
+      }
+    } catch (error) {
+      console.error('Email verification error:', error);
+      toast({
+        title: "Verification Error",
+        description: "There was a problem verifying your email. Please try signing in manually.",
+        variant: "destructive",
+      });
+      setLocation('/auth');
+    }
+  };
 
   const handleSearch = async () => {
     if (!query.trim()) return;

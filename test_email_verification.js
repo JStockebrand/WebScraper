@@ -1,73 +1,98 @@
-// Test email verification setup in Supabase
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = 'https://csaksfdlssftgwobifis.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-if (!supabaseAnonKey) {
-  console.error('SUPABASE_ANON_KEY not found');
-  process.exit(1);
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Test email verification system and check current state
+import { storage } from './server/storage.ts';
 
 async function testEmailVerification() {
-  console.log('🔍 Testing email verification configuration...');
+  const email = 'jwstock3921@gmail.com';
   
-  // Test with a temporary email address
-  const testEmail = `test-${Date.now()}@example.com`;
-  const testPassword = 'TestPassword123!';
+  console.log('Investigating email verification issue...\n');
   
+  // Check current user state
+  console.log('1. Current User State:');
   try {
-    console.log(`📧 Attempting to register: ${testEmail}`);
-    
-    const { data, error } = await supabase.auth.signUp({
-      email: testEmail,
-      password: testPassword,
-      options: {
-        data: {
-          display_name: 'Test User',
-        },
-        emailRedirectTo: `${process.env.SITE_URL || 'http://localhost:5000'}/auth?verified=true`
+    const user = await storage.getUserByEmail(email);
+    if (user) {
+      console.log(`   User found: ${user.email}`);
+      console.log(`   ID: ${user.id}`);
+      console.log(`   Email Verified: ${user.emailVerified}`);
+      console.log(`   Status: ${user.subscriptionStatus}`);
+      console.log(`   Created: ${user.createdAt}`);
+    } else {
+      console.log(`   User not found in application database`);
+    }
+  } catch (error) {
+    console.log(`   Error: ${error.message}`);
+  }
+  
+  // Test Supabase Auth state
+  console.log('\n2. Testing Auth State:');
+  try {
+    const { supabaseAdmin } = await import('./server/services/supabase');
+    if (supabaseAdmin) {
+      console.log('   Supabase admin client available');
+      
+      // Try to get user by email (this would show auth state)
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email,
+          password: 'NewPassword123!'
+        })
+      });
+      
+      const result = await response.json();
+      console.log(`   Login test result: ${response.status}`);
+      console.log(`   Message: ${result.error || result.message}`);
+      
+      if (result.error && result.error.includes('Email not confirmed')) {
+        console.log('   ⚠️  Email verification still pending');
       }
+    } else {
+      console.log('   Supabase admin client not available');
+    }
+  } catch (error) {
+    console.log(`   Auth test error: ${error.message}`);
+  }
+  
+  // Check redirect URL configuration
+  console.log('\n3. Checking Redirect Configuration:');
+  const databaseUrl = process.env.DATABASE_URL;
+  if (databaseUrl && databaseUrl.includes('supabase')) {
+    const match = databaseUrl.match(/\/\/([^\.]+)\.(pooler\.)?supabase\.co/);
+    if (match) {
+      const projectRef = match[1];
+      console.log(`   Project Reference: ${projectRef}`);
+      console.log(`   Dashboard URL: https://supabase.com/dashboard/project/${projectRef}/auth/url-configuration`);
+      console.log('   Required redirect URLs should include:');
+      console.log(`   - http://localhost:5000/auth/callback`);
+      console.log(`   - https://*.replit.app/auth/callback`);
+      console.log(`   - Your production domain/auth/callback`);
+    }
+  }
+  
+  // Test email verification endpoint
+  console.log('\n4. Testing Email Verification Endpoint:');
+  try {
+    const response = await fetch('http://localhost:5000/auth/callback?type=signup', {
+      method: 'GET'
     });
     
-    if (error) {
-      console.error('❌ Registration failed:', error.message);
-      return false;
+    console.log(`   Verification endpoint status: ${response.status}`);
+    if (response.status === 404) {
+      console.log('   ⚠️  Email verification callback endpoint may be missing');
     }
-    
-    console.log('✅ Registration response received');
-    console.log(`   User ID: ${data.user?.id}`);
-    console.log(`   Email: ${data.user?.email}`);
-    console.log(`   Email confirmed: ${data.user?.email_confirmed_at ? 'Yes' : 'No'}`);
-    console.log(`   Session: ${data.session ? 'Created' : 'None (verification required)'}`);
-    
-    if (data.user && !data.user.email_confirmed_at && !data.session) {
-      console.log('✅ Email verification is properly configured - user needs to verify email');
-      console.log('📩 Supabase should have sent a verification email');
-      return true;
-    } else if (data.user && data.user.email_confirmed_at) {
-      console.log('⚠️  User was automatically confirmed - email verification may be disabled');
-      return false;
-    } else if (data.session) {
-      console.log('⚠️  User got a session immediately - email verification is disabled');
-      return false;
-    }
-    
   } catch (error) {
-    console.error('❌ Test failed:', error.message);
-    return false;
+    console.log(`   Verification endpoint test failed: ${error.message}`);
   }
+  
+  console.log('\n=== Investigation Results ===');
+  console.log('This analysis shows the current email verification state and potential issues.');
 }
 
-// Run the test
-testEmailVerification().then(success => {
-  if (success) {
-    console.log('\n✅ Email verification is properly configured');
-    console.log('📋 Note: Check your Supabase Auth settings if emails are not being sent');
-  } else {
-    console.log('\n❌ Email verification may not be properly configured');
-    console.log('📋 Check Supabase dashboard → Auth → Settings → Email confirmation');
-  }
+// Add fetch polyfill
+global.fetch = global.fetch || (async (...args) => {
+  const { default: fetch } = await import('node-fetch');
+  return fetch(...args);
 });
+
+testEmailVerification().catch(console.error);

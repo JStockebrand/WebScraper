@@ -10,6 +10,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   updateUser(id: string, updates: Partial<User>): Promise<void>;
   updateUserSearchUsage(id: string, increment: number): Promise<void>;
+  updateUserEmailVerification(id: string, isVerified: boolean): Promise<void>;
   deleteUser(id: string): Promise<void>;
   updateUserStripeInfo(id: string, customerId: string, subscriptionId: string): Promise<void>;
   
@@ -80,6 +81,18 @@ export class MemStorage implements IStorage {
         ...user, 
         searchesUsed: (user.searchesUsed || 0) + increment,
         updatedAt: new Date()
+      };
+      this.users.set(id, updatedUser);
+    }
+  }
+
+  async updateUserEmailVerification(id: string, isVerified: boolean): Promise<void> {
+    const user = this.users.get(id);
+    if (user) {
+      const updatedUser = { 
+        ...user, 
+        emailVerified: isVerified,
+        updatedAt: new Date() 
       };
       this.users.set(id, updatedUser);
     }
@@ -304,6 +317,15 @@ export class PgStorage implements IStorage {
         })
         .where(eq(users.id, id));
     }
+  }
+
+  async updateUserEmailVerification(id: string, isVerified: boolean): Promise<void> {
+    await this.db.update(users)
+      .set({
+        emailVerified: isVerified,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id));
   }
 
   async getUserSearches(userId: string, limit?: number): Promise<Search[]> {
