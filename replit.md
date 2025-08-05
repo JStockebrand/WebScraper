@@ -13,6 +13,8 @@ Preferred communication style: Simple, everyday language.
 
 **Solution Approach Preference**: Prioritize Supabase configuration changes over custom workarounds. When facing authentication or email verification issues, first investigate and recommend appropriate Supabase dashboard settings rather than building manual solutions.
 
+**Current Email Verification Issue**: Email confirmation is disabled in Supabase project settings. User needs to enable "Confirm email" setting in Authentication → Settings to receive verification emails.
+
 ## System Architecture
 
 ### Full-Stack Structure
