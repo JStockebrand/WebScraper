@@ -1,6 +1,7 @@
 # Web Scrape Summarizer
 
 A streamlined web application that allows users to search the web, scrape content from search results, and generate AI-powered summaries of the found content.
+Initial built for a Supabase database and Stripe for payment. Stripe payment is not complete and will need to update your Supabase project settings.
 
 ## Features
 
